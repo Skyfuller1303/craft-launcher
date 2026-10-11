@@ -118,10 +118,15 @@ pub(crate) fn run(operation: &str, target: &OsStr, log: &Path, directory: Option
         .output()
         .map_err(|e| format!("couldn't start the Windows Installer ({e})"))?;
     let outcome: Outcome = serde_json::from_slice(&output.stdout).map_err(|_| "The Windows Installer helper returned an unreadable result.")?;
+    result(outcome, log)
+}
+
+fn result(outcome: Outcome, log: &Path) -> Result<(), String> {
     if let Some(error) = outcome.error {
         return Err(format!("Windows Installer could not start: {error}"));
     }
-    windows::explain(outcome.code).map_err(|error| format!("{error}\nMSI log: {}", log.display()))
+    windows::explain(outcome.code)
+        .map_err(|error| if error == artcraft_launcher_core::protocol::CANCELLED { error } else { format!("{error}\nMSI log: {}", log.display()) })
 }
 
 #[cfg(test)]
@@ -199,7 +204,7 @@ $null = $database.Commit()
         let outcome: Outcome = serde_json::from_str(&result).unwrap();
         assert!(outcome.error.is_none());
         assert_eq!(outcome.code, Some(1602));
-        assert_eq!(windows::explain(outcome.code), Err("cancelled".into()));
+        assert_eq!(super::result(outcome, Path::new(r"C:\Cache\install.log")), Err(artcraft_launcher_core::protocol::CANCELLED.into()));
     }
 
     #[test]
