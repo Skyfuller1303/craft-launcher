@@ -394,3 +394,5 @@ filter	Installed	Установлены
 @msg	MSI downgrade failed; the original version was restored. {details}	Откат MSI не удался; исходная версия восстановлена. {details}
 @msg	MSI downgrade failed; recovery also failed. {details}	Откат MSI и восстановление не удались. {details}
 	Retrying automatically in {seconds}s…	Автоматическая повторная попытка через {seconds} с…
+	Keep this version after switching	Закрепить эту версию после переключения
+	MSI installation runs in the background. Windows may ask for administrator permission.	Установка MSI выполняется в фоновом режиме. Windows может запросить права администратора.

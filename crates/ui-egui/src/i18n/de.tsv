@@ -395,3 +395,5 @@ filter	Installed	Installiert
 @msg	MSI downgrade failed; the original version was restored. {details}	MSI-Downgrade fehlgeschlagen; ursprüngliche Version wurde wiederhergestellt. {details}
 @msg	MSI downgrade failed; recovery also failed. {details}	MSI-Downgrade und Wiederherstellung fehlgeschlagen. {details}
 	Retrying automatically in {seconds}s…	Automatischer neuer Versuch in {seconds}s…
+	Keep this version after switching	Version nach Wechsel festhalten
+	MSI installation runs in the background. Windows may ask for administrator permission.	MSI-Installation läuft im Hintergrund. Windows fragt eventuell nach Administratorrechten.

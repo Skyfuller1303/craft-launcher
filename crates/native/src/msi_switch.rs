@@ -276,15 +276,8 @@ fn directory_argument(property: &str, folder: &Path) -> Result<std::ffi::OsStrin
 
 impl WindowsSwitch<'_> {
     fn run(&self, operation: &str, file: &std::ffi::OsStr, directory: Option<&str>) -> Result<(), String> {
-        use std::os::windows::process::CommandExt;
-
-        let mut command = process::command(windows::msiexec());
-        command.arg(operation).arg(file).args(["/passive", "/norestart", "/l*v+"]).arg(&self.log);
-        if let Some(directory) = directory {
-            command.raw_arg(directory_argument(directory, self.folder)?);
-        }
-        let status = command.status().map_err(|e| format!("couldn't start the Windows Installer ({e})"))?;
-        windows::explain(status.code())
+        let directory = directory.map(|directory| directory_argument(directory, self.folder)).transpose()?;
+        crate::windows_msi::run(operation, file, &self.log, directory.as_deref())
     }
     fn verify(&self, package: &Package) -> Result<(), String> {
         let installs = crate::detect::windows::msi_installs(self.app);

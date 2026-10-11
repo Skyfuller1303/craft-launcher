@@ -327,6 +327,10 @@ fn an_msi_downgrade_is_enabled_but_requires_confirmation_and_supports_cancel() {
         h.run_steps(3);
         assert!(!sent.borrow().iter().any(|c| matches!(c, Command::InstallRelease { .. })));
         snapshot(&mut h, &format!("msi-downgrade-confirmation-{language}"));
+        let pin = if language == "de" { "Version nach Wechsel festhalten" } else { "Keep this version after switching" };
+        h.get_by_label(pin).click();
+        h.run_steps(3);
+        assert!(h.state().as_ref().unwrap().settings.apps.is_empty());
         h.get_by_label(if language == "de" { "Abbrechen" } else { "Cancel" }).click();
         h.run_steps(3);
         assert!(!sent.borrow().iter().any(|c| matches!(c, Command::InstallRelease { .. })));
@@ -334,13 +338,52 @@ fn an_msi_downgrade_is_enabled_but_requires_confirmation_and_supports_cancel() {
         h.get_by_label(switch).click();
         h.run_steps(3);
         snapshot(&mut h, &format!("msi-second-confirmation-{language}"));
+        h.get_by_label(if language == "de" {
+            "Neuester Version gemäß globalen Update-Einstellungen folgen."
+        } else {
+            "Follow the latest release using the global update settings."
+        });
         h.get_by_label(if language == "de" { "Deinstallieren und wechseln" } else { "Uninstall and switch" }).click();
         h.run_steps(3);
         assert!(
             sent.borrow().iter().any(
-                |c| matches!(c, Command::InstallRelease { app, tag, confirmed_msi_downgrade: true, .. } if app == "photocraft" && tag == "v0.6.0")
+                |c| matches!(c, Command::InstallRelease { app, tag, preferences, confirmed_msi_downgrade: true } if app == "photocraft" && tag == "v0.6.0" && preferences.pinned_tag.is_none())
             )
         );
         assert!(h.state().as_ref().unwrap().settings.apps.is_empty());
+    }
+}
+
+#[test]
+fn switching_can_pin_or_follow_updates_for_both_upgrade_and_downgrade() {
+    for tag in ["v0.7.0", "v0.5.0"] {
+        for pin in [true, false] {
+            let (mut h, sent, inbox) = setup(Settings { language: "en".into(), notify: false, ..Settings::default() }, true);
+            h.run_steps(5);
+            open(&mut h, "App settings…");
+            h.get_by_value("v0.6.0").click();
+            h.run_steps(3);
+            h.get_by_label(if tag == "v0.7.0" { "v0.7.0 · Latest" } else { tag }).click();
+            h.run_steps(3);
+            if !pin {
+                h.get_by_label("Keep this version after switching").click();
+                h.run_steps(3);
+            }
+            h.get_by_label(&format!("Switch to {tag}")).click();
+            h.run_steps(3);
+            let preferences = sent
+                .borrow()
+                .iter()
+                .find_map(|c| match c {
+                    Command::InstallRelease { tag: actual, preferences, .. } if actual == tag => Some(preferences.clone()),
+                    _ => None,
+                })
+                .unwrap();
+            assert_eq!(preferences.pinned_tag.as_deref(), pin.then_some(tag));
+            assert!(h.state().as_ref().unwrap().settings.apps.is_empty());
+            inbox.borrow_mut().push(Event::VersionInstalled { app: "photocraft".into(), preferences });
+            h.run_steps(3);
+            assert_eq!(h.state().as_ref().unwrap().settings.apps["photocraft"].pinned_tag.as_deref(), pin.then_some(tag));
+        }
     }
 }

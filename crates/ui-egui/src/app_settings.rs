@@ -23,6 +23,10 @@ pub(crate) struct Draft {
 }
 
 impl Draft {
+    pub(crate) fn set_pin(&mut self, pin: bool) {
+        self.pin = pin;
+    }
+
     fn preferences(&self) -> AppPreferences {
         AppPreferences {
             pinned_tag: self.pin.then(|| self.tag.clone()),
@@ -158,6 +162,7 @@ impl LauncherUi {
         let mut can_install = false;
         let mut same_version = false;
         let mut msi_downgrade = false;
+        let mut msi_package = false;
         egui::ScrollArea::vertical().max_height(ui.ctx().content_rect().height() * 0.55).show(ui, |ui| {
             if !draft.installation_tab {
                 ui.label(fmt(
@@ -216,6 +221,7 @@ impl LauncherUi {
                 selected = releases.iter().find(|r| r.tag == draft.tag).cloned();
                 if let Some(release) = &selected {
                     let asset = self.platform.and_then(|p| pick_asset(release, &stems, p, &kinds));
+                    msi_package = asset.is_some_and(|(_, kind)| kind == PackageKind::Msi);
                     same_version = release.version.as_ref().is_some_and(|v| Some(v) == current);
                     let downgrade = release.version.as_ref().zip(current).is_some_and(|(target, current)| target < current);
                     msi_downgrade = downgrade && asset.is_some_and(|(_, kind)| kind == PackageKind::Msi);
@@ -262,7 +268,7 @@ impl LauncherUi {
                 }
                 ui.add_space(12.0);
                 ui.add_enabled_ui(!busy, |ui| {
-                    ui.checkbox(&mut draft.pin, tl!("Keep the selected version"));
+                    ui.checkbox(&mut draft.pin, tl!("Keep this version after switching"));
                 });
                 ui.label(if draft.pin {
                     tl!("Automatic updates and Update all will leave this version unchanged.")
@@ -270,6 +276,10 @@ impl LauncherUi {
                     tl!("Follow the latest release using the global update settings.")
                 });
                 ui.add_space(12.0);
+                if msi_package {
+                    ui.label(tl!("MSI installation runs in the background. Windows may ask for administrator permission."));
+                    ui.add_space(8.0);
+                }
                 let label = fmt(tl!("Switch to {version}"), &[("version", &draft.tag)]);
                 ui.add_enabled_ui(can_install && !busy && entry.detected && self.caps.manage_apps, |ui| {
                     install = widgets::button(ui, &label, Kind::Primary, 0.0).clicked();

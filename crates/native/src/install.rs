@@ -1096,17 +1096,9 @@ pub mod windows {
         }
     }
 
-    /// Runs an MSI with a progress window and no restart. Windows asks for permission itself.
+    /// Runs an MSI without an installer window or restart. Per-machine packages ask for elevation.
     pub fn run_msi(msi: &Path, stop: &Stop, phase: &mut dyn FnMut(JobPhase)) -> Result<(), String> {
-        in_turn(stop, phase, JobPhase::Installing, || {
-            let status = process::command(msiexec())
-                .arg("/i")
-                .arg(msi)
-                .args(["/passive", "/norestart"])
-                .status()
-                .map_err(|e| format!("couldn't start the Windows Installer ({e})"))?;
-            explain(status.code())
-        })
+        in_turn(stop, phase, JobPhase::Installing, || crate::windows_msi::run("/i", msi.as_os_str(), &msi.with_extension("msi.log"), None))
     }
 
     /// Runs `work` once no other Windows Installer job of ours is running (a second one would

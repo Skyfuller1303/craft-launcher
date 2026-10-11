@@ -26,6 +26,8 @@ pub mod queue;
 pub mod self_update;
 pub mod single_instance;
 pub mod source;
+#[cfg(windows)]
+mod windows_msi;
 
 pub use backend::NativeBackend;
 

@@ -193,7 +193,24 @@ impl LauncherUi {
         ui.add_space(8.0);
         ui.label(tl!("Windows will uninstall the current version, then install the selected version in the same folder. Administrator permission may be required."));
         ui.add_space(8.0);
+        ui.label(tl!("MSI installation runs in the background. Windows may ask for administrator permission."));
+        ui.add_space(8.0);
         ui.label(tl!("If installation fails, the launcher will try to restore the original version. If recovery fails, it keeps the installers and shows their location."));
+        ui.add_space(16.0);
+        let mut preferences = preferences.clone();
+        let mut pin = preferences.pinned_tag.is_some();
+        if ui.checkbox(&mut pin, tl!("Keep this version after switching")).changed() {
+            preferences.pinned_tag = pin.then(|| tag.to_string());
+            if let Some(draft) = self.app_settings.as_mut().filter(|draft| draft.app == id) {
+                draft.set_pin(pin);
+            }
+            self.dialog = Some(Dialog::ConfirmMsiDowngrade { app: id.to_string(), tag: tag.to_string(), preferences: preferences.clone() });
+        }
+        ui.label(if pin {
+            tl!("Automatic updates and Update all will leave this version unchanged.")
+        } else {
+            tl!("Follow the latest release using the global update settings.")
+        });
         ui.add_space(16.0);
         let mut close = false;
         ui.horizontal(|ui| {
