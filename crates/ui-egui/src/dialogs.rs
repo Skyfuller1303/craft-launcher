@@ -24,10 +24,12 @@ impl LauncherUi {
             Dialog::Notes(id) => modal.show(ctx, |ui| close = self.notes_dialog(ui, id)),
             Dialog::ConfirmUninstall(id) => modal.show(ctx, |ui| close = self.uninstall_dialog(ui, id)),
             Dialog::Settings => modal.show(ctx, |ui| close = self.settings_dialog(ui, host)),
+            Dialog::AppSettings(id) => modal.show(ctx, |ui| close = self.app_settings_dialog(ui, id)),
             Dialog::LauncherUpdate(r) => modal.show(ctx, |ui| close = self.launcher_update_dialog(ui, r)),
         };
         if close || response.should_close() {
             self.dialog = None;
+            self.app_settings = None;
         }
     }
 

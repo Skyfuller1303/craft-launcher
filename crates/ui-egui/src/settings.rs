@@ -83,6 +83,8 @@ impl CheckEvery {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
+    #[serde(default)]
+    pub apps: BTreeMap<String, artcraft_launcher_core::protocol::AppPreferences>,
     pub view: ViewMode,
     pub filter: Filter,
     pub sort: SortKey,
@@ -166,6 +168,7 @@ pub fn default_preferred_kinds() -> Vec<PackageKind> {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            apps: BTreeMap::new(),
             view: ViewMode::Grid,
             filter: Filter::All,
             sort: SortKey::Suite,

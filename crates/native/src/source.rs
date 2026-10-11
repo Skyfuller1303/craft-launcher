@@ -24,6 +24,9 @@ pub struct Answer {
 
 /// Looks up latest releases. Called from worker threads.
 pub trait ReleaseSource: Send + Sync {
+    fn history(&self, _repo: &str, _page: u32) -> Result<artcraft_launcher_core::protocol::ReleasePage, String> {
+        Err("release history is unavailable".into())
+    }
     fn latest(&self, repo: &str, prereleases: bool) -> Answer;
     /// The last answer saved for `repo`, for an instant first paint.
     fn cached(&self, repo: &str, prereleases: bool) -> Option<LatestRelease>;
@@ -132,6 +135,24 @@ impl GitHubSource {
 }
 
 impl ReleaseSource for GitHubSource {
+    fn history(&self, repo: &str, page: u32) -> Result<artcraft_launcher_core::protocol::ReleasePage, String> {
+        if !(1..=20).contains(&page) {
+            return Err("release history page is out of range".into());
+        }
+        if self.limited() {
+            return Err("GitHub's request limit was reached. Try again later.".into());
+        }
+        let url = format!("https://api.github.com/repos/{repo}/releases?per_page=30&page={page}");
+        match self.http.get_api(&url, None)? {
+            Fetched::Body { text, .. } => release::parse_github_history(&text, repo),
+            Fetched::NotFound => Ok(Default::default()),
+            Fetched::RateLimited { reset } => {
+                *self.limited_until.lock().unwrap_or_else(PoisonError::into_inner) = Some(reset.unwrap_or_else(|| crate::now() + 15 * 60));
+                Err("GitHub's request limit was reached. Try again later.".into())
+            }
+            Fetched::NotModified => Err("GitHub returned no release history".into()),
+        }
+    }
     fn latest(&self, repo: &str, prereleases: bool) -> Answer {
         let api_error = if self.limited() {
             None

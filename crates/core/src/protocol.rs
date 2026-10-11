@@ -23,6 +23,21 @@ pub enum Command {
     Install {
         app: String,
     },
+    /// Fetch one page of published releases without blocking the UI.
+    LoadReleases {
+        app: String,
+        page: u32,
+        force: bool,
+    },
+    /// Install an exact release offered by the backend, then commit its preferences on success.
+    InstallRelease {
+        app: String,
+        tag: String,
+        preferences: AppPreferences,
+    },
+    PickInstallDirectory {
+        app: String,
+    },
     Uninstall {
         app: String,
     },
@@ -54,6 +69,24 @@ pub struct BackendOptions {
     pub kinds: Vec<PackageKind>,
     /// Offer pre-releases (`0.6.0-rc.1`) as updates.
     pub prereleases: bool,
+    #[serde(default)]
+    pub apps: std::collections::BTreeMap<String, AppPreferences>,
+}
+
+/// Per-app choices, independent of the detected installation.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AppPreferences {
+    pub pinned_tag: Option<String>,
+    /// Parent folder for a new portable installation. Existing installs retain their location.
+    pub install_dir: Option<String>,
+    pub package: Option<PackageKind>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReleasePage {
+    pub releases: Vec<Release>,
+    pub more: bool,
 }
 
 /// The answer to "what's the latest release of this app?".
@@ -147,6 +180,20 @@ impl Source {
 /// Something the backend wants the UI to know.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
+    Releases {
+        app: String,
+        page: u32,
+        result: Result<ReleasePage, String>,
+    },
+    /// Sent only once the exact requested version has been detected on disk.
+    VersionInstalled {
+        app: String,
+        preferences: AppPreferences,
+    },
+    InstallDirectory {
+        app: String,
+        directory: Option<String>,
+    },
     Latest {
         app: String,
         latest: LatestRelease,

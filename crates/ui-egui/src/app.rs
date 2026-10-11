@@ -67,6 +67,7 @@ pub(crate) enum Dialog {
     Notes(String),
     ConfirmUninstall(String),
     Settings,
+    AppSettings(String),
     LauncherUpdate(artcraft_launcher_core::Release),
 }
 
@@ -91,6 +92,7 @@ pub struct LauncherUi {
     pub(crate) search: String,
     pub(crate) toasts: Vec<Toast>,
     pub(crate) dialog: Option<Dialog>,
+    pub(crate) app_settings: Option<crate::app_settings::Draft>,
     started: bool,
     applied_theme: Option<theme::ThemeChoice>,
     /// Fonts registered with `set_fonts` only exist from the next frame on; drawing with the named
@@ -147,6 +149,7 @@ impl LauncherUi {
             search: String::new(),
             toasts: Vec::new(),
             dialog: None,
+            app_settings: None,
             started: false,
             applied_theme: None,
             fonts_ready: false,
@@ -210,7 +213,11 @@ impl LauncherUi {
     /// Non-drawing work: runs every frame and also while the window is hidden in the tray.
     pub fn logic(&mut self, ctx: &egui::Context, host: &mut dyn Host) {
         set_current(crate::i18n::Lang::from_pref(&self.settings.language));
-        let options = BackendOptions { kinds: self.settings.preferred_kinds.clone(), prereleases: self.settings.prereleases };
+        for entry in &mut self.entries {
+            entry.pinned = self.settings.apps.get(entry.app.id).is_some_and(|p| p.pinned_tag.is_some());
+        }
+        let options =
+            BackendOptions { kinds: self.settings.preferred_kinds.clone(), prereleases: self.settings.prereleases, apps: self.settings.apps.clone() };
         if self.sent_options.as_ref() != Some(&options) {
             self.backend.send(Command::Configure(options.clone()));
             self.sent_options = Some(options);
@@ -259,6 +266,48 @@ impl LauncherUi {
     /// Returns whether app state changed.
     fn handle(&mut self, ctx: &egui::Context, event: Event) -> bool {
         match event {
+            Event::Releases { app, page, result } => {
+                if let Some(entry) = self.entry_mut(&app) {
+                    if entry.history_loading != Some(page) {
+                        return false;
+                    }
+                    entry.history_loading = None;
+                    match result {
+                        Ok(history) => {
+                            if page == 1 {
+                                entry.releases.clear();
+                            }
+                            for release in history.releases {
+                                if !entry.releases.iter().any(|r| r.tag == release.tag) {
+                                    entry.releases.push(release);
+                                }
+                            }
+                            entry.releases.sort_by(|a, b| b.version.cmp(&a.version).then_with(|| b.published_at.cmp(&a.published_at)));
+                            entry.history_page = page;
+                            entry.history_more = history.more && page < 20;
+                            entry.history_error = None;
+                        }
+                        Err(error) => entry.history_error = Some(error),
+                    }
+                }
+                false
+            }
+            Event::VersionInstalled { app, preferences } => {
+                if let Some(entry) = self.entry_mut(&app) {
+                    entry.pinned = preferences.pinned_tag.is_some();
+                }
+                self.settings.apps.insert(app, preferences);
+                true
+            }
+            Event::InstallDirectory { app, directory } => {
+                if let Some(draft) = &mut self.app_settings
+                    && draft.app == app
+                    && let Some(directory) = directory
+                {
+                    draft.directory = directory;
+                }
+                false
+            }
             Event::Latest { app, latest, from } => {
                 if let Some(e) = self.entry_mut(&app) {
                     // A failed check keeps the release we already know about (and where it came from).

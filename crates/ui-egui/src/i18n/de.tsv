@@ -325,3 +325,51 @@ filter	Installed	Installiert
 	ArtCraft on GitHub	ArtCraft auf GitHub
 	Join the ArtCraft Discord	Dem ArtCraft-Discord beitreten
 @plural	ArtCraft Launcher · {n} update available|ArtCraft Launcher · {n} updates available	ArtCraft Launcher · {n} Update verfügbar|ArtCraft Launcher · {n} Updates verfügbar
+
+# Per-app version and installation settings.
+	App settings	App-Einstellungen
+	App settings…	App-Einstellungen…
+	Installation	Installation
+	Version	Version
+	Installed: {version}	Installiert: {version}
+	Version is kept	Version wird beibehalten
+	Selected release	Gewähltes Release
+	Select a release	Release auswählen
+	Show pre-releases	Vorabversionen anzeigen
+	Loading releases…	Releases werden geladen…
+	Refresh releases	Releases aktualisieren
+	Load older releases	Ältere Releases laden
+	No published releases are available.	Keine veröffentlichten Releases verfügbar.
+	This package cannot downgrade here. Use a portable installation instead.	Dieses Paket unterstützt hier kein Downgrade. Verwende eine portable Installation.
+	No compatible download for this release.	Kein kompatibler Download für dieses Release.
+	This release has no published checksum.	Für dieses Release ist keine Prüfsumme veröffentlicht.
+	This release's version cannot be verified.	Versionsnummer dieses Releases lässt sich nicht überprüfen.
+	An older version will replace the installed program.	Eine ältere Version ersetzt das installierte Programm.
+	Keep the selected version	Gewählte Version beibehalten
+	Automatic updates and Update all will leave this version unchanged.	Automatische Updates und „Alle aktualisieren“ behalten diese Version bei.
+	Follow the latest release using the global update settings.	Neuester Version gemäß globalen Update-Einstellungen folgen.
+	Switch to {version}	Zu {version} wechseln
+	Current installation folder	Aktueller Installationsort
+	Open installation folder	Installationsordner öffnen
+	Version changes keep the existing installation folder and package format.	Versionswechsel behalten Installationsort und Paketformat bei.
+	Package format	Paketformat
+	System default	Systemstandard
+	Choose a folder for a new installation	Ordner für neue Installation auswählen
+	Browse…	Durchsuchen…
+	Custom folders are available for portable ZIP and AppImage packages.	Eigene Ordner sind für portable ZIP- und AppImage-Pakete verfügbar.
+	Installation in progress. You can close this window.	Installation läuft. Du kannst dieses Fenster schließen.
+	Save update preferences	Update-Einstellungen speichern
+
+# Version management messages.
+@msg	GitHub's request limit was reached. Try again later.	GitHubs Anfragelimit wurde erreicht. Versuche es später erneut.
+@msg	Reload the release list before selecting a version.	Lade die Release-Liste erneut, bevor du eine Version auswählst.
+@msg	This app is pinned to a selected version. Open its settings to change versions.	Dieses Tool behält eine gewählte Version bei. Öffne seine Einstellungen zum Versionswechsel.
+@msg	This release has no published checksum for this download.	Für diesen Download ist keine Prüfsumme veröffentlicht.
+@msg	This package format cannot safely downgrade here. Use a portable installation instead.	Dieses Paketformat unterstützt hier kein sicheres Downgrade. Verwende eine portable Installation.
+@msg	The installer finished, but the selected version could not be confirmed. Check the installed version before retrying.	Installation beendet, gewählte Version aber nicht bestätigt. Prüfe vor einem neuen Versuch die installierte Version.
+@msg	Custom folders are supported for portable ZIP and AppImage installations only.	Eigene Ordner werden nur für portable ZIP- und AppImage-Installationen unterstützt.
+@msg	The installation would overwrite an unrecorded file.	Installation würde eine persönliche oder fremde Datei überschreiben.
+@msg	Choose an absolute installation folder without parent-directory components.	Wähle einen absoluten Installationspfad ohne übergeordnete Pfadbestandteile.
+
+# Version management messages.
+@msg	The portable executable does not match the selected version. The installation was rolled back.	Die portable EXE entspricht nicht der gewählten Version. Installation wurde zurückgerollt.
