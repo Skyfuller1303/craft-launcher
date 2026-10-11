@@ -54,7 +54,9 @@ duplicate names and collisions with unrecorded files. Failed rollback retains re
 and reports their location. External installers and power loss have platform-specific limits;
 this feature does not promise transactional rollback for them.
 
-Windows orchestration and failure paths are covered by local tests. The actual registered
+Windows orchestration and failure paths are covered by local tests. MSI directory properties
+use `PROPERTY="value"` quoting for paths with spaces; a parser test runs Windows Installer
+against a nonexistent package without changing any installed software. The actual registered
 PhotoCraft MSI was inspected read-only; a real MSI uninstall/install cycle still needs a
 disposable Windows environment. Linux/macOS/FreeBSD installer execution still
 requires native validation on those platforms. The browser keeps its existing download-only

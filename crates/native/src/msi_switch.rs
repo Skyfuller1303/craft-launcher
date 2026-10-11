@@ -135,6 +135,8 @@ pub(crate) fn install(
     validate_packages(app, &target, &original, release, recovery, existing)?;
     let folder =
         exe.parent().filter(|p| p.is_absolute() && p.is_dir()).ok_or("The installed MSI folder could not be verified. Nothing was removed.")?;
+    // Validate the raw MSI property before any uninstall can begin.
+    directory_argument(&original.directory, folder)?;
     let recovery_root = job.paths.data.join("msi-recovery");
     std::fs::create_dir_all(&recovery_root).map_err(|e| format!("couldn't create the MSI recovery folder ({e})"))?;
     let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|e| e.to_string())?.as_nanos();
@@ -255,14 +257,31 @@ struct WindowsSwitch<'a> {
     original_safe: bool,
 }
 
+fn directory_argument(property: &str, folder: &Path) -> Result<std::ffi::OsString, String> {
+    use std::os::windows::ffi::OsStrExt;
+
+    if !matches!(property, "INSTALLFOLDER" | "INSTALLDIR")
+        || !folder.is_absolute()
+        || folder.as_os_str().encode_wide().any(|c| matches!(c, 0 | 10 | 13 | 34))
+    {
+        return Err("The installed MSI folder could not be verified. Nothing was removed.".into());
+    }
+    // MSI parses PROPERTY="value" itself. Command::arg would quote the entire
+    // PROPERTY=value token for spaces, which MSI rejects as an invalid command line.
+    let mut argument = std::ffi::OsString::from(format!("{property}=\""));
+    argument.push(folder);
+    argument.push("\"");
+    Ok(argument)
+}
+
 impl WindowsSwitch<'_> {
     fn run(&self, operation: &str, file: &std::ffi::OsStr, directory: Option<&str>) -> Result<(), String> {
+        use std::os::windows::process::CommandExt;
+
         let mut command = process::command(windows::msiexec());
         command.arg(operation).arg(file).args(["/passive", "/norestart", "/l*v+"]).arg(&self.log);
         if let Some(directory) = directory {
-            let mut property = std::ffi::OsString::from(format!("{directory}="));
-            property.push(self.folder);
-            command.arg(property);
+            command.raw_arg(directory_argument(directory, self.folder)?);
         }
         let status = command.status().map_err(|e| format!("couldn't start the Windows Installer ({e})"))?;
         windows::explain(status.code())
@@ -312,6 +331,51 @@ impl Switch for WindowsSwitch<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn msi_directory_property_quotes_only_the_value_and_rejects_injection() {
+        for property in ["INSTALLFOLDER", "INSTALLDIR"] {
+            for folder in [r"C:\Program Files\PhotoCraft", "D:\\Apps\\Übung 日本語\\", r"D:\Apps\PhotoCraft"] {
+                assert_eq!(directory_argument(property, Path::new(folder)).unwrap(), std::ffi::OsString::from(format!("{property}=\"{folder}\"")));
+            }
+        }
+        for folder in ["relative", "C:\\Apps\\bad\" /x product", "C:\\Apps\\bad\n", "C:\\Apps\\bad\r", "C:\\Apps\\bad\0"] {
+            assert!(directory_argument("INSTALLDIR", Path::new(folder)).is_err());
+        }
+        assert!(directory_argument("INSTALLDIR=bad /x", Path::new(r"C:\Apps")).is_err());
+    }
+
+    #[test]
+    fn windows_installer_accepts_directory_property_with_spaces() {
+        use std::os::windows::process::CommandExt;
+        use std::process::Stdio;
+        use std::time::Instant;
+
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("nonexistent.msi");
+        assert!(!missing.exists());
+        let log = dir.path().join("probe.log");
+        let mut command = process::command(windows::msiexec());
+        command.arg("/i").arg(&missing).args(["/qn", "/norestart", "/l*v+"]).arg(&log);
+        command.raw_arg(directory_argument("INSTALLFOLDER", Path::new(r"C:\Program Files\PhotoCraft")).unwrap());
+        let mut child = command.stdout(Stdio::null()).stderr(Stdio::null()).spawn().unwrap();
+        let start = Instant::now();
+        let status = loop {
+            if let Some(status) = child.try_wait().unwrap() {
+                break status;
+            }
+            if start.elapsed() > Duration::from_secs(10) {
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!("MSI command parsing hung before opening the nonexistent package");
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        };
+        // 1619 means the parser accepted the property and tried to open the missing
+        // package. No product exists to install, uninstall, or prompt for elevation.
+        assert_eq!(status.code(), Some(1619));
+        assert!(log.is_file());
+    }
 
     struct Fake {
         fail: &'static str,
