@@ -66,6 +66,7 @@ pub(crate) struct Toast {
 pub(crate) enum Dialog {
     Notes(String),
     ConfirmUninstall(String),
+    ConfirmMsiDowngrade { app: String, tag: String, preferences: artcraft_launcher_core::protocol::AppPreferences },
     Settings,
     AppSettings(String),
     LauncherUpdate(artcraft_launcher_core::Release),

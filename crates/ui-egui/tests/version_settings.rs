@@ -47,12 +47,20 @@ fn release(v: &str) -> Release {
         version: version::parse(v),
         name: format!("PhotoCraft {v}"),
         html_url: format!("https://github.com/storytold/photocraft/releases/tag/v{v}"),
-        assets: vec![Asset {
-            name: format!("photocraft-{v}-windows-x64-portable.zip"),
-            url: format!("https://github.com/storytold/photocraft/releases/download/v{v}/photocraft-{v}-windows-x64-portable.zip"),
-            size: 100,
-            sha256: Some("a".repeat(64)),
-        }],
+        assets: vec![
+            Asset {
+                name: format!("photocraft-{v}-windows-x64-portable.zip"),
+                url: format!("https://github.com/storytold/photocraft/releases/download/v{v}/photocraft-{v}-windows-x64-portable.zip"),
+                size: 100,
+                sha256: Some("a".repeat(64)),
+            },
+            Asset {
+                name: format!("photocraft-{v}-windows-x64.msi"),
+                url: format!("https://github.com/storytold/photocraft/releases/download/v{v}/photocraft-{v}-windows-x64.msi"),
+                size: 100,
+                sha256: Some("b".repeat(64)),
+            },
+        ],
         ..Release::default()
     }
 }
@@ -137,7 +145,7 @@ fn choosing_a_downgrade_waits_for_explicit_action_and_commits_only_after_success
         }
         h.get_by_label("Switch to v0.5.0").click();
         h.run_steps(3);
-        assert!(sent.borrow().iter().any(|c| matches!(c, Command::InstallRelease { app, tag, preferences }
+        assert!(sent.borrow().iter().any(|c| matches!(c, Command::InstallRelease { app, tag, preferences, .. }
             if app == "photocraft" && tag == "v0.5.0" && preferences.pinned_tag.as_deref() == Some("v0.5.0"))));
         inbox.borrow_mut().push(Event::JobFinished { app: "photocraft".into(), result: Err("disk full".into()) });
         h.run_steps(2);
@@ -263,5 +271,48 @@ fn table_keeps_the_vertical_menu_beside_open_in_narrow_windows() {
             h.run_steps(3);
             h.get_by_label("Version");
         }
+    }
+}
+
+#[test]
+fn an_msi_downgrade_is_enabled_but_requires_confirmation_and_supports_cancel() {
+    for language in ["en", "de"] {
+        let (mut h, sent, inbox) = setup(Settings { language: language.into(), notify: false, ..Settings::default() }, true);
+        inbox.borrow_mut().push(Event::Detected {
+            app: "photocraft".into(),
+            installed: Some(Installed {
+                version: version::parse("0.7.0"),
+                source: InstallSource::Msi,
+                location: "C:\\Program Files\\PhotoCraft\\photocraft.exe".into(),
+                package: Some("{10000000-0000-0000-0000-000000000000}".into()),
+            }),
+        });
+        h.run_steps(5);
+        open(&mut h, if language == "de" { "App-Einstellungen…" } else { "App settings…" });
+        h.get_by_value("v0.7.0").click();
+        h.run_steps(3);
+        h.get_by_label("v0.6.0").click();
+        h.run_steps(3);
+        snapshot(&mut h, &format!("msi-version-settings-{language}"));
+        let switch = if language == "de" { "Zu v0.6.0 wechseln" } else { "Switch to v0.6.0" };
+        h.get_by_label(switch).click();
+        h.run_steps(3);
+        assert!(!sent.borrow().iter().any(|c| matches!(c, Command::InstallRelease { .. })));
+        snapshot(&mut h, &format!("msi-downgrade-confirmation-{language}"));
+        h.get_by_label(if language == "de" { "Abbrechen" } else { "Cancel" }).click();
+        h.run_steps(3);
+        assert!(!sent.borrow().iter().any(|c| matches!(c, Command::InstallRelease { .. })));
+        snapshot(&mut h, &format!("msi-cancelled-settings-{language}"));
+        h.get_by_label(switch).click();
+        h.run_steps(3);
+        snapshot(&mut h, &format!("msi-second-confirmation-{language}"));
+        h.get_by_label(if language == "de" { "Deinstallieren und wechseln" } else { "Uninstall and switch" }).click();
+        h.run_steps(3);
+        assert!(
+            sent.borrow().iter().any(
+                |c| matches!(c, Command::InstallRelease { app, tag, confirmed_msi_downgrade: true, .. } if app == "photocraft" && tag == "v0.6.0")
+            )
+        );
+        assert!(h.state().as_ref().unwrap().settings.apps.is_empty());
     }
 }

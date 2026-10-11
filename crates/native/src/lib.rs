@@ -15,6 +15,8 @@ pub mod http;
 pub mod install;
 pub mod login;
 pub mod manifest;
+#[cfg(windows)]
+mod msi_switch;
 pub mod packages;
 pub mod paths;
 pub mod portable;

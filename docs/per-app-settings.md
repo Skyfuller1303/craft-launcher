@@ -30,12 +30,22 @@ their location and package format; this feature does not migrate installations.
 | Format | Version changes | Custom folder |
 | --- | --- | --- |
 | Windows portable ZIP | Upgrade and downgrade; executable VERSIONINFO must match the selected release | New installations only |
-| Windows MSI | Upgrade; downgrade blocked | Installer-managed |
+| Windows MSI | Upgrade; confirmed stable-release downgrade with verified recovery installer | Installer-managed; downgrade preserves the existing folder |
 | macOS DMG | Existing bundle replacement and version checks | Existing application location |
 | Linux AppImage | Replace verified download at existing location | New installations only |
 | Linux DEB | Existing apt installation, including its downgrade support | System-managed |
 | Linux RPM / Flatpak | Upgrade; downgrade blocked | System-managed |
 | FreeBSD tarball | Existing installer path | Existing prefix |
+
+MSI downgrades require both the selected and installed releases to be loaded with compatible,
+checksummed MSI assets. **Switch to …** opens a confirmation; **Uninstall and switch** starts
+preparation. Both installers are verified and copied into the portable data's `msi-recovery`
+folder before removal. Their app identity, product/upgrade codes, versions, architecture,
+installation scope and directory property must match the installed app. The original MSI is
+then removed and the target installed at the same location. Failed installation or version
+checks trigger a separate attempt to restore the original version. Recovery failure retains
+the installers, a recovery record and installer log, and reports their folder. A dismissed
+administrator prompt or power loss can prevent recovery; rollback is not guaranteed.
 
 Windows portable replacement backs up recorded program files and rolls back on copy,
 version-verification or manifest-save errors. Unrecorded settings and documents are preserved,
@@ -44,7 +54,9 @@ duplicate names and collisions with unrecorded files. Failed rollback retains re
 and reports their location. External installers and power loss have platform-specific limits;
 this feature does not promise transactional rollback for them.
 
-Windows behavior is covered by local tests. Linux/macOS/FreeBSD installer execution still
+Windows orchestration and failure paths are covered by local tests. The actual registered
+PhotoCraft MSI was inspected read-only; a real MSI uninstall/install cycle still needs a
+disposable Windows environment. Linux/macOS/FreeBSD installer execution still
 requires native validation on those platforms. The browser keeps its existing download-only
 interface; native settings and installation actions are desktop-only.
 

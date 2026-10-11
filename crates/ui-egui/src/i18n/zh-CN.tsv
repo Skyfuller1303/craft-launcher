@@ -344,3 +344,24 @@ soundcraft	Recording, editing and mixing audio	音频录制、编辑与混音
 
 # Version management messages.
 @msg	The portable executable does not match the selected version. The installation was rolled back.	便携式可执行文件与所选版本不符。安装已回滚。
+
+# Confirmed MSI version changes.
+	MSI downgrade requires removing the current version first. You will confirm before it starts.	MSI 降级需要先卸载当前版本。开始前将请您确认。
+	Downgrade {name} to {version}?	将 {name} 降级至 {version}？
+	Both MSI installers are downloaded and verified before anything is removed.	卸载前会下载并验证两个 MSI 安装程序。
+	Windows will uninstall the current version, then install the selected version in the same folder. Administrator permission may be required.	Windows 将卸载当前版本，然后把所选版本安装到同一文件夹。可能需要管理员权限。
+	If installation fails, the launcher will try to restore the original version. If recovery fails, it keeps the installers and shows their location.	如果安装失败，启动器会尝试恢复原版本。如果恢复失败，将保留安装程序并显示其位置。
+	Uninstall and switch	卸载并切换
+	Load the installed release before downgrading its MSI package.	降级 MSI 软件包前，请先加载已安装版本的发行版。
+@msg	Load the installed release before downgrading its MSI package.	降级 MSI 软件包前，请先加载已安装版本的发行版。
+	MSI downgrades require stable releases.	MSI 降级需要稳定发行版。
+@msg	Choose an older MSI release in App settings and confirm the downgrade.	请在应用设置中选择旧版 MSI 发行版并确认降级。
+@msg	The installed release has no compatible recovery MSI.	已安装版本没有兼容的恢复 MSI。
+@msg	Could not inspect the MSI package. Nothing was removed.	无法检查 MSI 软件包。未卸载任何内容。
+@msg	The MSI packages do not match the installed app. Nothing was removed.	MSI 软件包与已安装应用不匹配。未卸载任何内容。
+@msg	The installed MSI folder could not be verified. Nothing was removed.	无法验证已安装 MSI 的文件夹。未卸载任何内容。
+@msg	Both MSI releases need published checksums before downgrading.	降级前，两个 MSI 发行版都需要公开的校验和。
+@msg	The recovery MSI copy could not be verified. Nothing was removed.	无法验证恢复 MSI 的副本。未卸载任何内容。
+@msg	The installed MSI version or folder does not match the expected app.	已安装 MSI 的版本或文件夹与预期应用不匹配。
+@msg	MSI downgrade failed; the original version was restored. {details}	MSI 降级失败；已恢复原版本。{details}
+@msg	MSI downgrade failed; recovery also failed. {details}	MSI 降级和恢复均失败。{details}

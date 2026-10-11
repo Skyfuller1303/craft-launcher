@@ -34,6 +34,8 @@ pub enum Command {
         app: String,
         tag: String,
         preferences: AppPreferences,
+        /// The user confirmed that downgrading an MSI first removes the installed version.
+        confirmed_msi_downgrade: bool,
     },
     PickInstallDirectory {
         app: String,

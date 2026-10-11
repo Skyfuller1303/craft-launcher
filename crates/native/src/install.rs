@@ -1081,11 +1081,11 @@ pub mod windows {
 
     use super::*;
 
-    fn msiexec() -> PathBuf {
+    pub(crate) fn msiexec() -> PathBuf {
         std::env::var_os("SystemRoot").map_or_else(|| PathBuf::from(r"C:\Windows"), PathBuf::from).join(r"System32\msiexec.exe")
     }
 
-    fn explain(code: Option<i32>) -> Result<(), String> {
+    pub(crate) fn explain(code: Option<i32>) -> Result<(), String> {
         match code {
             Some(0 | 3010 | 1641) => Ok(()),
             Some(1602) => Err("cancelled".into()),
@@ -1111,7 +1111,12 @@ pub mod windows {
 
     /// Runs `work` once no other Windows Installer job of ours is running (a second one would
     /// stop with error 1618). Cancelled while it waits, it never runs.
-    fn in_turn(stop: &Stop, phase: &mut dyn FnMut(JobPhase), working: JobPhase, work: impl FnOnce() -> Result<(), String>) -> Result<(), String> {
+    pub(crate) fn in_turn(
+        stop: &Stop,
+        phase: &mut dyn FnMut(JobPhase),
+        working: JobPhase,
+        work: impl FnOnce() -> Result<(), String>,
+    ) -> Result<(), String> {
         INSTALLER.alone(&cancelled(stop), &mut turn(phase, working), work).unwrap_or_else(|| Err(CANCELLED.into()))
     }
 

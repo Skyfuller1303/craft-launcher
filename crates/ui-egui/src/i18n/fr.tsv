@@ -371,3 +371,24 @@ filter	Installed	Installées
 
 # Version management messages.
 @msg	The portable executable does not match the selected version. The installation was rolled back.	L’exécutable portable ne correspond pas à la version choisie. L’installation a été annulée et les fichiers restaurés.
+
+# Confirmed MSI version changes.
+	MSI downgrade requires removing the current version first. You will confirm before it starts.	La rétrogradation MSI nécessite de supprimer la version actuelle. Vous confirmerez avant le démarrage.
+	Downgrade {name} to {version}?	Rétrograder {name} vers {version} ?
+	Both MSI installers are downloaded and verified before anything is removed.	Les deux installateurs MSI sont téléchargés et vérifiés avant toute suppression.
+	Windows will uninstall the current version, then install the selected version in the same folder. Administrator permission may be required.	Windows désinstallera la version actuelle, puis installera la version choisie dans le même dossier. Des droits administrateur peuvent être nécessaires.
+	If installation fails, the launcher will try to restore the original version. If recovery fails, it keeps the installers and shows their location.	Si l’installation échoue, le lanceur tentera de restaurer la version initiale. Si la restauration échoue, les installateurs sont conservés et leur emplacement est affiché.
+	Uninstall and switch	Désinstaller et changer
+	Load the installed release before downgrading its MSI package.	Chargez la version installée avant de rétrograder son paquet MSI.
+@msg	Load the installed release before downgrading its MSI package.	Chargez la version installée avant de rétrograder son paquet MSI.
+	MSI downgrades require stable releases.	Les rétrogradations MSI nécessitent des versions stables.
+@msg	Choose an older MSI release in App settings and confirm the downgrade.	Choisissez une ancienne version MSI dans les paramètres de l’application et confirmez la rétrogradation.
+@msg	The installed release has no compatible recovery MSI.	La version installée ne dispose pas de MSI compatible pour la restauration.
+@msg	Could not inspect the MSI package. Nothing was removed.	Impossible de vérifier le paquet MSI. Aucune suppression.
+@msg	The MSI packages do not match the installed app. Nothing was removed.	Les paquets MSI ne correspondent pas à l’application installée. Aucune suppression.
+@msg	The installed MSI folder could not be verified. Nothing was removed.	Impossible de vérifier le dossier MSI installé. Aucune suppression.
+@msg	Both MSI releases need published checksums before downgrading.	Les deux versions MSI nécessitent des sommes de contrôle publiées pour la rétrogradation.
+@msg	The recovery MSI copy could not be verified. Nothing was removed.	Impossible de vérifier la copie MSI de restauration. Aucune suppression.
+@msg	The installed MSI version or folder does not match the expected app.	La version ou le dossier MSI installé ne correspond pas à l’application attendue.
+@msg	MSI downgrade failed; the original version was restored. {details}	La rétrogradation MSI a échoué ; la version initiale a été restaurée. {details}
+@msg	MSI downgrade failed; recovery also failed. {details}	La rétrogradation MSI et la restauration ont échoué. {details}
