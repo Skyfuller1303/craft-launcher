@@ -122,6 +122,7 @@ impl LauncherUi {
     pub(crate) fn toolbar(&mut self, ui: &mut Ui) {
         let t = Tokens::get(ui.ctx());
         if self.dialog.is_none()
+            && (!self.launcher_pinned() || self.launcher_job.is_some())
             && let Some(r) = self.launcher_update.clone()
         {
             egui::Frame::new()

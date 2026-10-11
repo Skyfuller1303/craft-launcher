@@ -386,3 +386,10 @@ filter	Installed	Instalados
 	Keep this version after switching	Manter esta versão após a troca
 	MSI installation runs in the background. Windows may ask for administrator permission.	A instalação MSI é executada em segundo plano. O Windows pode solicitar permissão de administrador.
 @msg	Could not save the launcher update state. Update was not started.	Não foi possível salvar o estado da atualização do launcher. A atualização não foi iniciada.
+	Launcher version	Versão do launcher
+	Choose launcher version…	Escolher versão do launcher…
+	Launcher MSI downgrades require a portable copy. This installation can upgrade only.	Para rebaixar o launcher MSI, use uma cópia portátil. Esta instalação permite apenas atualizações.
+@msg	Launcher MSI downgrades require a portable copy. This installation can upgrade only.	Para rebaixar o launcher MSI, use uma cópia portátil. Esta instalação permite apenas atualizações.
+	The launcher will wait for other installs, switch versions and restart.	O launcher aguardará outras instalações, trocará de versão e reiniciará.
+	Older launcher releases may not support version preferences.	Versões antigas do launcher podem não oferecer preferências de versão.
+	This development or externally managed launcher cannot switch versions in place.	Este launcher de desenvolvimento ou gerenciado externamente não pode trocar de versão no local.

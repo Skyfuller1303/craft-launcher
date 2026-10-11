@@ -269,6 +269,16 @@ impl LauncherUi {
             ui.add(egui::Label::new(RichText::new(note).size(12.0).color(t.warn)).wrap());
         }
 
+        if self.caps.manage_apps {
+            section(ui, tl!("Launcher version"));
+            if widgets::button(ui, tl!("Choose launcher version…"), Kind::Secondary, 0.0).clicked() {
+                self.open_app_settings(artcraft_launcher_core::catalog::LAUNCHER_ID);
+            }
+            if self.launcher_pinned() {
+                ui.label(tl!("Version is kept"));
+            }
+        }
+
         section(ui, tl!("Updates"));
         let mut every = self.settings.check_every;
         row(ui, tl!("Check for updates"), &mut |ui| {

@@ -226,6 +226,12 @@ pub enum Event {
     LauncherUpdate(Release),
     /// The new launcher is in place (or will be, once this one exits): quit now so it can start.
     LauncherRestarting,
+    /// A verified launcher download has been scheduled. Commit preferences only after restart
+    /// into the selected version; the exit helper may still fail to install it.
+    LauncherSwitchScheduled {
+        tag: String,
+        preferences: AppPreferences,
+    },
     /// News and alerts from ArtCraft's release feed (replaces any earlier set).
     Notices {
         announcements: Vec<crate::feed::Notice>,
@@ -284,6 +290,10 @@ pub trait Backend {
     /// Events since the last call, oldest first.
     fn poll(&mut self) -> Vec<Event>;
     fn capabilities(&self) -> Capabilities;
+    /// The running launcher, including its installation format.
+    fn launcher_installation(&self) -> Option<Installed> {
+        None
+    }
     /// The machine apps would be installed on (on the web: the visitor's, best guess).
     fn platform(&self) -> Option<Platform>;
     /// Unix seconds now.

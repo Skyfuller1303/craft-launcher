@@ -5,7 +5,7 @@ use crate::i18n::{fmt, msg};
 use crate::theme::Tokens;
 use crate::widgets::{self, Kind};
 use artcraft_launcher_core::protocol::{AppPreferences, Command};
-use artcraft_launcher_core::{InstallSource, Os, PackageKind, platform::pick_asset};
+use artcraft_launcher_core::{InstallSource, Os, PackageKind, catalog::LAUNCHER_ID, platform::pick_asset};
 
 pub(crate) fn release_retry_delay(failures: u32, minimum: u64) -> u64 {
     (5_u64 << failures.saturating_sub(1).min(4)).min(60).max(minimum)
@@ -38,7 +38,7 @@ impl Draft {
 
 impl LauncherUi {
     pub(crate) fn load_app_releases(&mut self, id: &str, page: u32, force: bool) {
-        let Some(entry) = self.entries.iter_mut().find(|e| e.app.id == id) else { return };
+        let Some(entry) = self.entry_mut(id) else { return };
         if entry.history_loading.is_some() {
             return;
         }
@@ -54,7 +54,7 @@ impl LauncherUi {
         };
         let now = ctx.input(|i| i.time);
         let mut retry = None;
-        for entry in &mut self.entries {
+        for entry in self.entries.iter_mut().chain(std::iter::once(&mut self.launcher_entry)) {
             if active.as_deref() != Some(entry.app.id) {
                 entry.history_retry = None;
                 entry.history_failures = 0;
@@ -113,11 +113,14 @@ impl LauncherUi {
         let tokens = Tokens::get(ui.ctx());
         ui.set_width(560.0f32.min((ui.ctx().content_rect().width() - 64.0).max(260.0)));
         ui.label(widgets::heading(entry.app.name, 24.0, tokens.ink_strong));
-        widgets::hud(ui, tl!("App settings"), tokens.muted);
+        let launcher = id == LAUNCHER_ID;
+        widgets::hud(ui, if launcher { tl!("Launcher version") } else { tl!("App settings") }, tokens.muted);
         ui.add_space(14.0);
         ui.horizontal(|ui| {
             ui.selectable_value(&mut draft.installation_tab, false, tl!("Version"));
-            ui.selectable_value(&mut draft.installation_tab, true, tl!("Installation"));
+            if !launcher {
+                ui.selectable_value(&mut draft.installation_tab, true, tl!("Installation"));
+            }
         });
         ui.separator();
         let busy = entry.job.is_some();
@@ -224,8 +227,10 @@ impl LauncherUi {
                     msi_package = asset.is_some_and(|(_, kind)| kind == PackageKind::Msi);
                     same_version = release.version.as_ref().is_some_and(|v| Some(v) == current);
                     let downgrade = release.version.as_ref().zip(current).is_some_and(|(target, current)| target < current);
-                    msi_downgrade = downgrade && asset.is_some_and(|(_, kind)| kind == PackageKind::Msi);
-                    let blocked = downgrade && asset.is_some_and(|(_, kind)| matches!(kind, PackageKind::Rpm | PackageKind::Flatpak));
+                    msi_downgrade = !launcher && downgrade && asset.is_some_and(|(_, kind)| kind == PackageKind::Msi);
+                    let blocked = downgrade
+                        && asset
+                            .is_some_and(|(_, kind)| matches!(kind, PackageKind::Rpm | PackageKind::Flatpak) || launcher && kind == PackageKind::Msi);
                     let recovery_available = !msi_downgrade
                         || releases.iter().any(|r| {
                             r.version.as_ref().is_some_and(|v| Some(v) == current)
@@ -246,7 +251,9 @@ impl LauncherUi {
                         && release.version.is_some()
                         && (!draft.custom || !draft.directory.trim().is_empty())
                         && (draft.prereleases || !release.prerelease && release.version.as_ref().is_none_or(|v| v.pre.is_empty()));
-                    if blocked {
+                    if blocked && launcher && msi_package {
+                        ui.label(tl!("Launcher MSI downgrades require a portable copy. This installation can upgrade only."));
+                    } else if blocked {
                         ui.label(tl!("This package cannot downgrade here. Use a portable installation instead."));
                     } else if !recovery_available {
                         ui.label(tl!("Load the installed release before downgrading its MSI package."));
@@ -281,9 +288,19 @@ impl LauncherUi {
                     ui.add_space(8.0);
                 }
                 let label = fmt(tl!("Switch to {version}"), &[("version", &draft.tag)]);
-                ui.add_enabled_ui(can_install && !busy && entry.detected && self.caps.manage_apps, |ui| {
-                    install = widgets::button(ui, &label, Kind::Primary, 0.0).clicked();
-                });
+                if launcher {
+                    ui.label(tl!("The launcher will wait for other installs, switch versions and restart."));
+                    ui.label(tl!("Older launcher releases may not support version preferences."));
+                    if !self.caps.self_update {
+                        ui.label(tl!("This development or externally managed launcher cannot switch versions in place."));
+                    }
+                }
+                ui.add_enabled_ui(
+                    can_install && !busy && entry.detected && if launcher { self.caps.self_update } else { self.caps.manage_apps },
+                    |ui| {
+                        install = widgets::button(ui, &label, Kind::Primary, 0.0).clicked();
+                    },
+                );
             } else {
                 ui.label(tl!("Current installation folder"));
                 if let Some(installed) = &entry.installed {
@@ -351,7 +368,7 @@ impl LauncherUi {
             });
         });
         if refresh {
-            if let Some(entry) = self.entries.iter_mut().find(|e| e.app.id == id) {
+            if let Some(entry) = self.entry_mut(id) {
                 entry.history_failures = 0;
             }
             self.load_app_releases(id, 1, true);

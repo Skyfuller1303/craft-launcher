@@ -64,6 +64,24 @@ the checkbox choice in its draft. Separate uninstall actions are unchanged.
 
 ## Launcher self-update
 
+Open **Settings → Choose launcher version…** to select the launcher's own GitHub release.
+The same release dropdown, pre-release filter, pagination and transient-error retry apply.
+Selection alone does not install. **Switch to …** downloads and verifies the chosen release,
+waits for other installations to finish, then replaces the launcher and restarts it. The
+installation format and location stay unchanged.
+
+**Keep this version after switching** also applies to the launcher. Its preference is staged
+when the restart helper is scheduled, then committed only when the restarted launcher reports
+the selected version. A failed switch retains the previous preference. Pinning the currently
+installed release with **Save update preferences** prevents automatic launcher updates;
+unchecking it returns to the global update policy. Older releases may not understand these
+new preferences, so pinning cannot be guaranteed after downgrading into them.
+
+Launcher MSI installations support upgrades only: unlike tool MSI downgrades, the running
+launcher cannot coordinate its own removal/recovery. Use a portable copy for launcher
+downgrades. Portable ZIP, macOS app, Linux AppImage and DEB replacement support older releases;
+RPM downgrades remain blocked. Development and externally managed copies cannot switch in place.
+
 The existing global **Automatic updates** setting also updates the launcher. It downloads and
 verifies the new release, waits for other jobs to finish, then restarts. Windows MSI self-update
 now uses the same quiet MSI argument builder, with no installer window or forced reboot. The

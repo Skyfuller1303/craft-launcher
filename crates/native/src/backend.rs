@@ -242,7 +242,7 @@ impl NativeBackend {
     }
 
     fn load_releases(&self, app_id: &str, page: u32, force: bool) {
-        let Some(app) = CraftApp::by_id(app_id) else { return };
+        let Some(app) = (if app_id == LAUNCHER_ID { Some(&LAUNCHER) } else { CraftApp::by_id(app_id) }) else { return };
         if !(1..=20).contains(&page) {
             self.shared.emit(Event::Releases { app: app_id.to_string(), page, result: Err("release history page is out of range".into()) });
             return;
@@ -554,7 +554,7 @@ impl NativeBackend {
     }
 
     /// Downloads the newer launcher, puts it in place and asks the UI to quit so it can start.
-    fn update_launcher(&self) {
+    fn update_launcher(&self, selection: Option<(Release, artcraft_launcher_core::protocol::AppPreferences)>) {
         let id = LAUNCHER_ID.to_string();
         let (Some(install), Some(platform)) = (self.self_install.clone(), self.platform) else {
             self.shared.emit(Event::JobFinished {
@@ -563,11 +563,26 @@ impl NativeBackend {
             });
             return;
         };
-        let Some(release) = self.shared.launcher_release.lock().unwrap_or_else(PoisonError::into_inner).clone() else { return };
+        let preferences = selection.as_ref().map(|(_, p)| p.clone());
+        if selection.is_none() && self.options().apps.get(LAUNCHER_ID).is_some_and(|p| p.pinned_tag.is_some()) {
+            self.shared.emit(Event::JobFinished {
+                app: id,
+                result: Err("This app is pinned to a selected version. Open its settings to change versions.".into()),
+            });
+            return;
+        }
+        let Some(release) = selection.map(|(r, _)| r).or_else(|| self.shared.launcher_release.lock().unwrap_or_else(PoisonError::into_inner).clone())
+        else {
+            return;
+        };
+        if let Err(error) = install.validate_release(&release, crate::self_update::current_version().as_ref()) {
+            self.shared.emit(Event::JobFinished { app: id, result: Err(error) });
+            return;
+        }
         let stop = Arc::new(Stop::default());
         {
             let mut jobs = self.shared.jobs.lock().unwrap_or_else(PoisonError::into_inner);
-            if jobs.contains_key(&id) {
+            if jobs.contains_key(&id) || self.shared.restarting.load(Ordering::SeqCst) {
                 return;
             }
             jobs.insert(id.clone(), stop.clone());
@@ -593,7 +608,12 @@ impl NativeBackend {
             };
             shared.jobs.lock().unwrap_or_else(PoisonError::into_inner).remove(LAUNCHER_ID);
             match result {
-                Ok(()) => shared.emit(Event::LauncherRestarting),
+                Ok(()) => {
+                    if let Some(preferences) = preferences {
+                        shared.emit(Event::LauncherSwitchScheduled { tag: release.tag.clone(), preferences });
+                    }
+                    shared.emit(Event::LauncherRestarting);
+                }
                 Err(e) => {
                     shared.restarting.store(false, Ordering::SeqCst);
                     shared.emit(Event::JobFinished { app: LAUNCHER_ID.to_string(), result: Err(e) });
@@ -1132,12 +1152,29 @@ impl Backend for NativeBackend {
                     .flat_map(|(_, (_, page))| &page.releases)
                     .find(|r| r.tag == tag)
                     .cloned()
-                    .or_else(|| self.shared.latest.lock().unwrap_or_else(PoisonError::into_inner).get(&app).filter(|r| r.tag == tag).cloned());
+                    .or_else(|| self.shared.latest.lock().unwrap_or_else(PoisonError::into_inner).get(&app).filter(|r| r.tag == tag).cloned())
+                    .or_else(|| {
+                        (app == LAUNCHER_ID)
+                            .then(|| self.shared.launcher_release.lock().unwrap_or_else(PoisonError::into_inner).clone())
+                            .flatten()
+                            .filter(|r| r.tag == tag)
+                    });
                 if let Some(release) = selected {
                     if preferences.pinned_tag.as_ref().is_some_and(|p| *p != tag) {
                         return;
                     }
-                    self.start_job(&app, false, Some((release, preferences, confirmed_msi_downgrade)));
+                    if app == LAUNCHER_ID {
+                        if preferences.install_dir.is_some() || preferences.package.is_some() {
+                            self.shared.emit(Event::JobFinished {
+                                app,
+                                result: Err("Version changes keep the existing installation folder and package format.".into()),
+                            });
+                            return;
+                        }
+                        self.update_launcher(Some((release, preferences)));
+                    } else {
+                        self.start_job(&app, false, Some((release, preferences, confirmed_msi_downgrade)));
+                    }
                 } else {
                     self.shared.emit(Event::JobFinished { app, result: Err("Reload the release list before selecting a version.".into()) });
                 }
@@ -1221,7 +1258,7 @@ impl Backend for NativeBackend {
                     }
                 }
             }
-            Command::UpdateLauncher => self.update_launcher(),
+            Command::UpdateLauncher => self.update_launcher(None),
             Command::Configure(options) => {
                 let changed_pre = {
                     let mut o = self.shared.options.lock().unwrap_or_else(PoisonError::into_inner);
@@ -1252,6 +1289,24 @@ impl Backend for NativeBackend {
             _ => "Show in Files",
         };
         Capabilities { manage_apps: true, reveal_label, self_update: self.self_install.is_some() }
+    }
+
+    fn launcher_installation(&self) -> Option<Installed> {
+        let source = match &self.self_install {
+            Some(crate::self_update::Install::MacApp(_)) => artcraft_launcher_core::InstallSource::MacApp,
+            Some(crate::self_update::Install::Msi(_)) => artcraft_launcher_core::InstallSource::Msi,
+            Some(crate::self_update::Install::Portable(_)) => artcraft_launcher_core::InstallSource::Launcher,
+            Some(crate::self_update::Install::AppImage(_)) => artcraft_launcher_core::InstallSource::AppImage,
+            Some(crate::self_update::Install::Package(PackageKind::Deb, _)) => artcraft_launcher_core::InstallSource::Deb,
+            Some(crate::self_update::Install::Package(PackageKind::Rpm, _)) => artcraft_launcher_core::InstallSource::Rpm,
+            _ => artcraft_launcher_core::InstallSource::Binary,
+        };
+        Some(Installed {
+            version: crate::self_update::current_version(),
+            source,
+            location: std::env::current_exe().ok().map(|p| p.display().to_string()).unwrap_or_default(),
+            package: None,
+        })
     }
 
     fn platform(&self) -> Option<Platform> {
@@ -1608,6 +1663,43 @@ mod tests {
         shared.latest.lock().unwrap().insert(APP.to_string(), release("0.5.0"));
         let shared = Arc::new(shared);
         NativeBackend { shared, paths: Paths::under(root), http: None, source, platform: Some(platform), self_install: None }
+    }
+
+    #[test]
+    fn launcher_history_and_selected_versions_use_the_self_update_path() {
+        use artcraft_launcher_core::protocol::{AppPreferences, ReleasePage};
+        let dir = tempfile::tempdir().unwrap();
+        let mut b = backend(dir.path(), Platform { os: Os::Windows, arch: Arch::X64 }, None);
+        b.self_install = Some(crate::self_update::Install::Msi(dir.path().join("launcher.exe")));
+        let old = Release { tag: "v0.0.1".into(), version: version::parse("0.0.1"), ..Release::default() };
+        let page = ReleasePage { releases: vec![old], more: false };
+        b.shared.history.lock().unwrap().insert((LAUNCHER_ID.into(), 1), (crate::now(), page.clone()));
+        b.send(Command::LoadReleases { app: LAUNCHER_ID.into(), page: 1, force: false });
+        assert_eq!(b.poll(), vec![Event::Releases { app: LAUNCHER_ID.into(), page: 1, result: Ok(page) }]);
+        b.send(Command::InstallRelease {
+            app: LAUNCHER_ID.into(),
+            tag: "v0.0.1".into(),
+            preferences: AppPreferences::default(),
+            confirmed_msi_downgrade: true,
+        });
+        assert!(matches!(b.poll().as_slice(), [Event::JobFinished { app, result: Err(e) }] if app == LAUNCHER_ID && e.contains("MSI downgrades")));
+        assert!(b.shared.jobs.lock().unwrap().is_empty());
+        b.send(Command::InstallRelease {
+            app: LAUNCHER_ID.into(),
+            tag: "v99.0.0".into(),
+            preferences: AppPreferences::default(),
+            confirmed_msi_downgrade: false,
+        });
+        assert!(matches!(b.poll().as_slice(), [Event::JobFinished { result: Err(e), .. }] if e.contains("Reload the release list")));
+        b.shared
+            .options
+            .lock()
+            .unwrap()
+            .apps
+            .insert(LAUNCHER_ID.into(), AppPreferences { pinned_tag: Some("v0.2.1".into()), ..AppPreferences::default() });
+        b.send(Command::UpdateLauncher);
+        assert!(matches!(b.poll().as_slice(), [Event::JobFinished { result: Err(e), .. }] if e.contains("pinned")));
+        assert!(b.shared.jobs.lock().unwrap().is_empty());
     }
 
     /// Reports again, and returns what the UI was last told about a kept download.

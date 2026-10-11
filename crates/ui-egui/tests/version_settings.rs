@@ -14,6 +14,8 @@ struct Fake {
     inbox: Inbox,
     sent: Sent,
     fail_history: bool,
+    launcher: Option<Installed>,
+    self_update: bool,
 }
 impl Backend for Fake {
     fn send(&mut self, command: Command) {
@@ -24,7 +26,14 @@ impl Backend for Fake {
                 result: if self.fail_history {
                     Err(artcraft_launcher_core::protocol::ReleaseError { message: "GitHub answered HTTP 504".into(), retry_after: Some(120) })
                 } else {
-                    Ok(ReleasePage { releases: vec![release("0.7.0"), release("0.6.0"), release("0.5.0")], more: false })
+                    Ok(ReleasePage {
+                        releases: if app == artcraft_launcher_core::catalog::LAUNCHER_ID {
+                            vec![launcher_release("0.3.0"), launcher_release("0.2.1"), launcher_release("0.1.0")]
+                        } else {
+                            vec![release("0.7.0"), release("0.6.0"), release("0.5.0")]
+                        },
+                        more: false,
+                    })
                 },
             });
         }
@@ -34,7 +43,10 @@ impl Backend for Fake {
         std::mem::take(&mut *self.inbox.borrow_mut())
     }
     fn capabilities(&self) -> Capabilities {
-        Capabilities { manage_apps: true, reveal_label: "Show in Explorer", self_update: false }
+        Capabilities { manage_apps: true, reveal_label: "Show in Explorer", self_update: self.self_update }
+    }
+    fn launcher_installation(&self) -> Option<Installed> {
+        self.launcher.clone()
     }
     fn platform(&self) -> Option<Platform> {
         Some(Platform { os: Os::Windows, arch: Arch::X64 })
@@ -70,6 +82,150 @@ fn release(v: &str) -> Release {
     }
 }
 
+fn launcher_release(v: &str) -> Release {
+    let mut r = release(v);
+    r.name = format!("ArtCraft Launcher {v}");
+    r.html_url = format!("https://github.com/storytold/craft-launcher/releases/tag/v{v}");
+    for asset in &mut r.assets {
+        asset.name = asset.name.replace("photocraft", "artcraft-launcher");
+        asset.url = asset.url.replace("storytold/photocraft", "storytold/craft-launcher").replace("/photocraft-", "/artcraft-launcher-");
+    }
+    r
+}
+
+fn setup_launcher(source: InstallSource, enabled: bool, settings: Settings) -> (Harness<'static, Option<LauncherUi>>, Sent, Inbox) {
+    artcraft_launcher_ui_egui::i18n::set_test_lang(artcraft_launcher_ui_egui::i18n::Lang::EN);
+    let inbox = Rc::new(RefCell::new(Vec::new()));
+    let sent = Rc::new(RefCell::new(Vec::new()));
+    let mut backend = Some(Fake {
+        inbox: inbox.clone(),
+        sent: sent.clone(),
+        fail_history: false,
+        self_update: enabled,
+        launcher: Some(Installed {
+            version: version::parse("0.2.1"),
+            source,
+            location: "C:\\Tools\\ArtCraft Launcher\\artcraft-launcher.exe".into(),
+            package: None,
+        }),
+    });
+    let h = Harness::builder().with_size(egui::vec2(1180.0, 1000.0)).with_theme(egui::Theme::Dark).build_ui_state(
+        move |ui, state: &mut Option<LauncherUi>| {
+            if state.is_none()
+                && let Some(b) = backend.take()
+            {
+                *state = Some(LauncherUi::new(ui.ctx(), Box::new(b), settings.clone()));
+            }
+            if let Some(l) = state {
+                l.logic(&ui.ctx().clone(), &mut NoHost);
+                l.ui(ui, &mut NoHost);
+            }
+        },
+        None,
+    );
+    (h, sent, inbox)
+}
+
+#[test]
+fn launcher_settings_choose_exact_release_without_installing_or_pinning_the_draft() {
+    let (mut h, sent, inbox) = setup_launcher(InstallSource::Launcher, true, Settings { language: "en".into(), ..Settings::default() });
+    h.run_steps(5);
+    h.get_by_label("Settings").click();
+    h.run_steps(3);
+    snapshot(&mut h, "launcher-settings-entry-en");
+    h.get_by_label("Choose launcher version…").click();
+    h.run_steps(5);
+    assert!(sent.borrow().contains(&Command::LoadReleases { app: artcraft_launcher_core::catalog::LAUNCHER_ID.into(), page: 1, force: false }));
+    assert_eq!(h.query_all_by_label("Installation").count(), 0);
+    h.get_by_value("v0.2.1").click();
+    h.run_steps(3);
+    snapshot(&mut h, "launcher-version-dropdown-en");
+    h.get_by_label("v0.1.0").click();
+    h.run_steps(3);
+    assert!(h.state().as_ref().unwrap().settings.apps.is_empty());
+    assert!(!sent.borrow().iter().any(|c| matches!(c, Command::InstallRelease { .. })));
+    snapshot(&mut h, "launcher-version-portable-en");
+    h.get_by_label("Switch to v0.1.0").click();
+    h.run_steps(3);
+    assert_eq!(sent.borrow().iter().filter(|c| matches!(c, Command::InstallRelease { app, tag, preferences, .. } if app == artcraft_launcher_core::catalog::LAUNCHER_ID && tag == "v0.1.0" && preferences.pinned_tag.as_deref() == Some("v0.1.0"))).count(), 1);
+    assert!(h.state().as_ref().unwrap().settings.pending_launcher_switch.is_none());
+    inbox.borrow_mut().push(Event::LauncherSwitchScheduled {
+        tag: "v0.1.0".into(),
+        preferences: AppPreferences { pinned_tag: Some("v0.1.0".into()), ..AppPreferences::default() },
+    });
+    h.run_steps(2);
+    assert!(h.state().as_ref().unwrap().settings.pending_launcher_switch.is_some());
+    assert!(h.state().as_ref().unwrap().settings.apps.is_empty(), "exit helper has not installed yet");
+}
+
+#[test]
+fn launcher_msi_blocks_downgrades_but_can_select_upgrades_and_disable_pinning() {
+    let (mut h, sent, _) = setup_launcher(InstallSource::Msi, true, Settings { language: "en".into(), ..Settings::default() });
+    h.run_steps(5);
+    h.get_by_label("Settings").click();
+    h.run_steps(3);
+    h.get_by_label("Choose launcher version…").click();
+    h.run_steps(5);
+    h.get_by_value("v0.2.1").click();
+    h.run_steps(3);
+    h.get_by_label("v0.1.0").click();
+    h.run_steps(3);
+    h.get_by_label("Switch to v0.1.0").click();
+    h.run_steps(2);
+    assert!(!sent.borrow().iter().any(|c| matches!(c, Command::InstallRelease { .. })));
+    h.get_by_label("Launcher MSI downgrades require a portable copy. This installation can upgrade only.");
+    h.get_by_value("v0.1.0").click();
+    h.run_steps(3);
+    h.get_by_label("v0.3.0").click();
+    h.run_steps(3);
+    h.get_by_label("Keep this version after switching").click();
+    h.run_steps(2);
+    snapshot(&mut h, "launcher-version-msi-en");
+    h.get_by_label("Switch to v0.3.0").click();
+    h.run_steps(3);
+    assert!(sent.borrow().iter().any(|c| matches!(c, Command::InstallRelease { app, tag, preferences, .. } if app == artcraft_launcher_core::catalog::LAUNCHER_ID && tag == "v0.3.0" && preferences.pinned_tag.is_none())));
+}
+
+#[test]
+fn launcher_development_instance_lists_releases_but_cannot_replace_itself() {
+    let (mut h, sent, _) = setup_launcher(InstallSource::Launcher, false, Settings { language: "en".into(), ..Settings::default() });
+    h.run_steps(5);
+    h.get_by_label("Settings").click();
+    h.run_steps(3);
+    h.get_by_label("Choose launcher version…").click();
+    h.run_steps(5);
+    h.get_by_value("v0.2.1").click();
+    h.run_steps(3);
+    h.get_by_label("v0.3.0").click();
+    h.run_steps(3);
+    h.get_by_label("Switch to v0.3.0").click();
+    h.run_steps(2);
+    h.get_by_label("This development or externally managed launcher cannot switch versions in place.");
+    assert!(!sent.borrow().iter().any(|c| matches!(c, Command::InstallRelease { .. })));
+}
+
+#[test]
+fn launcher_pin_suppresses_auto_update_and_is_applied_only_after_actual_restart() {
+    let id = artcraft_launcher_core::catalog::LAUNCHER_ID;
+    let pin = AppPreferences { pinned_tag: Some("v0.2.1".into()), ..AppPreferences::default() };
+    for success in [false, true] {
+        let settings = Settings {
+            language: "en".into(),
+            auto_update: true,
+            pending_launcher_switch: Some((if success { "v0.2.1" } else { "v0.3.0" }.into(), pin.clone())),
+            ..Settings::default()
+        };
+        let (mut h, sent, inbox) = setup_launcher(InstallSource::Msi, true, settings);
+        h.run_steps(5);
+        let saved = &h.state().as_ref().unwrap().settings;
+        assert_eq!(saved.apps.contains_key(id), success);
+        assert!(saved.pending_launcher_switch.is_none());
+        inbox.borrow_mut().push(Event::LauncherUpdate(launcher_release("0.3.0")));
+        h.run_steps(5);
+        assert_eq!(sent.borrow().contains(&Command::UpdateLauncher), !success);
+    }
+}
+
 fn setup(settings: Settings, installed: bool) -> (Harness<'static, Option<LauncherUi>>, Sent, Inbox) {
     setup_at_width(settings, installed, 1180.0)
 }
@@ -95,7 +251,7 @@ fn setup_history(settings: Settings, installed: bool, width: f32, fail_history: 
     }
     let inbox = Rc::new(RefCell::new(events));
     let sent = Rc::new(RefCell::new(Vec::new()));
-    let mut backend = Some(Fake { inbox: inbox.clone(), sent: sent.clone(), fail_history });
+    let mut backend = Some(Fake { inbox: inbox.clone(), sent: sent.clone(), fail_history, launcher: None, self_update: false });
     let h = Harness::builder().with_size(egui::vec2(width, 900.0)).with_theme(egui::Theme::Dark).build_ui_state(
         move |ui, state: &mut Option<LauncherUi>| {
             if state.is_none()

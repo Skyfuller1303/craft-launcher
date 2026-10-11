@@ -369,3 +369,10 @@ soundcraft	Recording, editing and mixing audio	音频录制、编辑与混音
 	Keep this version after switching	切换后锁定此版本
 	MSI installation runs in the background. Windows may ask for administrator permission.	MSI 安装在后台运行。Windows 可能会请求管理员权限。
 @msg	Could not save the launcher update state. Update was not started.	无法保存启动器更新状态。更新未启动。
+	Launcher version	启动器版本
+	Choose launcher version…	选择启动器版本…
+	Launcher MSI downgrades require a portable copy. This installation can upgrade only.	MSI 启动器降级需要便携版本。此安装仅支持升级。
+@msg	Launcher MSI downgrades require a portable copy. This installation can upgrade only.	MSI 启动器降级需要便携版本。此安装仅支持升级。
+	The launcher will wait for other installs, switch versions and restart.	启动器将等待其他安装完成，然后切换版本并重启。
+	Older launcher releases may not support version preferences.	旧版启动器可能不支持版本偏好设置。
+	This development or externally managed launcher cannot switch versions in place.	此开发版或由外部管理的启动器无法直接切换版本。
