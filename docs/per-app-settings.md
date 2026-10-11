@@ -19,7 +19,7 @@ Permanent request, permission, certificate and malformed-response errors require
 action. Refresh remains available between attempts.
 
 Selecting a version edits a draft. **Switch to …** explicitly installs it, checks its published
-SHA-256, and confirms the installed version. **Keep the selected version** prevents automatic
+SHA-256, and confirms the installed version. **Keep this version after switching** prevents automatic
 updates and **Update all** from replacing it. Preferences become active only after a successful
 switch. To change the policy without reinstalling, select the installed release and use
 **Save update preferences**. Following the latest release uses the global update settings.
@@ -54,6 +54,24 @@ then removed and the target installed at the same location. Failed installation 
 checks trigger a separate attempt to restore the original version. Recovery failure retains
 the installers, a recovery record and installer log, and reports their folder. A dismissed
 administrator prompt or power loss can prevent recovery; rollback is not guaranteed.
+
+Tool MSI installations, version changes and recovery run in the background with `/qn /norestart`.
+Windows may still request administrator permission for per-machine packages. Per-user packages
+do not request extra elevation; mixed installation scopes require an interactive installer or
+portable package. The MSI downgrade confirmation also lets you choose whether to keep the target
+version after switching. Cancelling does not save preferences; returning to App settings retains
+the checkbox choice in its draft. Separate uninstall actions are unchanged.
+
+## Launcher self-update
+
+The existing global **Automatic updates** setting also updates the launcher. It downloads and
+verifies the new release, waits for other jobs to finish, then restarts. Windows MSI self-update
+now uses the same quiet MSI argument builder, with no installer window or forced reboot. The
+restart helper waits for the old process to exit before installing. Installation failure keeps
+the MSI and log, blocks the same release for ten minutes to prevent a restart loop, and attempts
+to restart the existing launcher. It can be offered again on an update check after that cooldown.
+A launcher's self-update always requires a published checksum and a saved update guard.
+Development instances started with `--dev-instance` continue to disable self-update.
 
 Windows portable replacement backs up recorded program files and rolls back on copy,
 version-verification or manifest-save errors. Unrecorded settings and documents are preserved,

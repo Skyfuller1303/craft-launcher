@@ -395,3 +395,4 @@ filter	Installed	Installées
 	Retrying automatically in {seconds}s…	Nouvelle tentative automatique dans {seconds}s…
 	Keep this version after switching	Conserver cette version après le changement
 	MSI installation runs in the background. Windows may ask for administrator permission.	L’installation MSI s’exécute en arrière-plan. Windows peut demander une autorisation administrateur.
+@msg	Could not save the launcher update state. Update was not started.	Impossible d’enregistrer l’état de mise à jour du lanceur. La mise à jour n’a pas démarré.

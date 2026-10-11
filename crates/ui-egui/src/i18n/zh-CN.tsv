@@ -368,3 +368,4 @@ soundcraft	Recording, editing and mixing audio	音频录制、编辑与混音
 	Retrying automatically in {seconds}s…	{seconds} 秒后自动重试…
 	Keep this version after switching	切换后锁定此版本
 	MSI installation runs in the background. Windows may ask for administrator permission.	MSI 安装在后台运行。Windows 可能会请求管理员权限。
+@msg	Could not save the launcher update state. Update was not started.	无法保存启动器更新状态。更新未启动。

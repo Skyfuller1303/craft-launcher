@@ -63,8 +63,8 @@ pub fn capture_command(cmd: Command, timeout: Duration) -> Option<String> {
 }
 
 fn run_command(mut cmd: Command, program: &str, timeout: Duration) -> Result<String, String> {
-    let mut child = cmd.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()
-        .map_err(|e| format!("couldn't start {program} ({e})"))?;
+    let mut child =
+        cmd.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().map_err(|e| format!("couldn't start {program} ({e})"))?;
     // Read both pipes while it runs, so a chatty helper can't block on a full one.
     let (stdout, stderr) = (read_all(child.stdout.take()), read_all(child.stderr.take()));
     let start = Instant::now();

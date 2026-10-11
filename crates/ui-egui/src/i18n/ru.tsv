@@ -396,3 +396,4 @@ filter	Installed	Установлены
 	Retrying automatically in {seconds}s…	Автоматическая повторная попытка через {seconds} с…
 	Keep this version after switching	Закрепить эту версию после переключения
 	MSI installation runs in the background. Windows may ask for administrator permission.	Установка MSI выполняется в фоновом режиме. Windows может запросить права администратора.
+@msg	Could not save the launcher update state. Update was not started.	Не удалось сохранить состояние обновления лаунчера. Обновление не запущено.
