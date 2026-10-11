@@ -13,6 +13,7 @@ type Sent = Rc<RefCell<Vec<Command>>>;
 struct Fake {
     inbox: Inbox,
     sent: Sent,
+    fail_history: bool,
 }
 impl Backend for Fake {
     fn send(&mut self, command: Command) {
@@ -20,7 +21,11 @@ impl Backend for Fake {
             self.inbox.borrow_mut().push(Event::Releases {
                 app: app.clone(),
                 page: *page,
-                result: Ok(ReleasePage { releases: vec![release("0.7.0"), release("0.6.0"), release("0.5.0")], more: false }),
+                result: if self.fail_history {
+                    Err(artcraft_launcher_core::protocol::ReleaseError { message: "GitHub answered HTTP 504".into(), retry_after: Some(120) })
+                } else {
+                    Ok(ReleasePage { releases: vec![release("0.7.0"), release("0.6.0"), release("0.5.0")], more: false })
+                },
             });
         }
         self.sent.borrow_mut().push(command);
@@ -70,6 +75,10 @@ fn setup(settings: Settings, installed: bool) -> (Harness<'static, Option<Launch
 }
 
 fn setup_at_width(settings: Settings, installed: bool, width: f32) -> (Harness<'static, Option<LauncherUi>>, Sent, Inbox) {
+    setup_history(settings, installed, width, false)
+}
+
+fn setup_history(settings: Settings, installed: bool, width: f32, fail_history: bool) -> (Harness<'static, Option<LauncherUi>>, Sent, Inbox) {
     // Each test sets its own language; these tests run serially when capturing screenshots.
     artcraft_launcher_ui_egui::i18n::set_test_lang(artcraft_launcher_ui_egui::i18n::Lang::EN);
     let mut events = vec![Event::Latest { app: "photocraft".into(), latest: LatestRelease::Found(release("0.7.0")), from: Origin::GitHub }];
@@ -86,7 +95,7 @@ fn setup_at_width(settings: Settings, installed: bool, width: f32) -> (Harness<'
     }
     let inbox = Rc::new(RefCell::new(events));
     let sent = Rc::new(RefCell::new(Vec::new()));
-    let mut backend = Some(Fake { inbox: inbox.clone(), sent: sent.clone() });
+    let mut backend = Some(Fake { inbox: inbox.clone(), sent: sent.clone(), fail_history });
     let h = Harness::builder().with_size(egui::vec2(width, 900.0)).with_theme(egui::Theme::Dark).build_ui_state(
         move |ui, state: &mut Option<LauncherUi>| {
             if state.is_none()
@@ -115,6 +124,25 @@ fn open(h: &mut Harness<'_, Option<LauncherUi>>, label: &str) {
     h.run_steps(3);
     h.get_by_label(label).click();
     h.run_steps(5);
+}
+
+#[test]
+fn release_history_retry_countdown_and_close_remain_visible_in_english_and_german() {
+    for (language, settings_label, countdown, close, filename) in [
+        ("en", "App settings…", "Retrying automatically in 120s…", "Close", "releases-retry-en"),
+        ("de", "App-Einstellungen…", "Automatischer neuer Versuch in 120s…", "Schließen", "releases-retry-de"),
+    ] {
+        let (mut h, sent, _) = setup_history(Settings { language: language.into(), notify: false, ..Settings::default() }, true, 1180.0, true);
+        h.run_steps(5);
+        open(&mut h, settings_label);
+        assert!(h.get_by_label(countdown).rect().bottom() < 900.0);
+        assert!(h.get_by_label(close).rect().bottom() < 900.0);
+        assert_eq!(sent.borrow().iter().filter(|c| matches!(c, Command::LoadReleases { .. })).count(), 1);
+        snapshot(&mut h, filename);
+        h.get_by_label(close).click();
+        h.run_steps(3);
+        assert_eq!(h.query_all_by_label(countdown).count(), 0);
+    }
 }
 
 #[test]

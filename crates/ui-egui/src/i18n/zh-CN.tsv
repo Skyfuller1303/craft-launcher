@@ -365,3 +365,4 @@ soundcraft	Recording, editing and mixing audio	音频录制、编辑与混音
 @msg	The installed MSI version or folder does not match the expected app.	已安装 MSI 的版本或文件夹与预期应用不匹配。
 @msg	MSI downgrade failed; the original version was restored. {details}	MSI 降级失败；已恢复原版本。{details}
 @msg	MSI downgrade failed; recovery also failed. {details}	MSI 降级和恢复均失败。{details}
+	Retrying automatically in {seconds}s…	{seconds} 秒后自动重试…

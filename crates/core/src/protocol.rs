@@ -179,13 +179,33 @@ impl Source {
     }
 }
 
+/// A release-history failure, optionally eligible for an automatic retry.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ReleaseError {
+    pub message: String,
+    /// A transient failure may be retried, after at least this many seconds.
+    pub retry_after: Option<u64>,
+}
+
+impl From<String> for ReleaseError {
+    fn from(message: String) -> Self {
+        Self { message, retry_after: None }
+    }
+}
+
+impl From<&str> for ReleaseError {
+    fn from(message: &str) -> Self {
+        message.to_string().into()
+    }
+}
+
 /// Something the backend wants the UI to know.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
     Releases {
         app: String,
         page: u32,
-        result: Result<ReleasePage, String>,
+        result: Result<ReleasePage, ReleaseError>,
     },
     /// Sent only once the exact requested version has been detected on disk.
     VersionInstalled {

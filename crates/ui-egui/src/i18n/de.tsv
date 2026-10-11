@@ -394,3 +394,4 @@ filter	Installed	Installiert
 @msg	The installed MSI version or folder does not match the expected app.	Installierte MSI-Version oder Ordner entspricht nicht der erwarteten App.
 @msg	MSI downgrade failed; the original version was restored. {details}	MSI-Downgrade fehlgeschlagen; ursprüngliche Version wurde wiederhergestellt. {details}
 @msg	MSI downgrade failed; recovery also failed. {details}	MSI-Downgrade und Wiederherstellung fehlgeschlagen. {details}
+	Retrying automatically in {seconds}s…	Automatischer neuer Versuch in {seconds}s…

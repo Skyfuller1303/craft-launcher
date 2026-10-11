@@ -9,6 +9,12 @@ use artcraft_launcher_core::{CraftApp, Installed};
 use crate::i18n::t;
 
 #[derive(Clone, Debug)]
+pub struct ReleaseRetry {
+    pub page: u32,
+    pub at: f64,
+}
+
+#[derive(Clone, Debug)]
 pub struct AppEntry {
     pub app: &'static CraftApp,
     pub latest: Option<LatestRelease>,
@@ -28,6 +34,8 @@ pub struct AppEntry {
     pub history_loading: Option<u32>,
     pub history_more: bool,
     pub history_error: Option<String>,
+    pub history_retry: Option<ReleaseRetry>,
+    pub history_failures: u32,
 }
 
 impl AppEntry {
@@ -47,6 +55,8 @@ impl AppEntry {
             history_loading: None,
             history_more: false,
             history_error: None,
+            history_retry: None,
+            history_failures: 0,
         }
     }
 

@@ -249,6 +249,7 @@ impl LauncherUi {
         for event in self.backend.poll() {
             changed |= self.handle(ctx, event);
         }
+        self.retry_app_releases(ctx);
         if changed {
             self.announce_updates(host);
             if self.settings.auto_update {
@@ -268,6 +269,8 @@ impl LauncherUi {
     fn handle(&mut self, ctx: &egui::Context, event: Event) -> bool {
         match event {
             Event::Releases { app, page, result } => {
+                let active = matches!(&self.dialog, Some(Dialog::AppSettings(id)) if id == &app);
+                let now = ctx.input(|i| i.time);
                 if let Some(entry) = self.entry_mut(&app) {
                     if entry.history_loading != Some(page) {
                         return false;
@@ -287,8 +290,21 @@ impl LauncherUi {
                             entry.history_page = page;
                             entry.history_more = history.more && page < 20;
                             entry.history_error = None;
+                            entry.history_retry = None;
+                            entry.history_failures = 0;
                         }
-                        Err(error) => entry.history_error = Some(error),
+                        Err(error) => {
+                            entry.history_error = Some(error.message);
+                            entry.history_retry = if active && let Some(minimum) = error.retry_after {
+                                entry.history_failures = entry.history_failures.saturating_add(1);
+                                Some(crate::model::ReleaseRetry {
+                                    page,
+                                    at: now + crate::app_settings::release_retry_delay(entry.history_failures, minimum) as f64,
+                                })
+                            } else {
+                                None
+                            };
+                        }
                     }
                 }
                 false

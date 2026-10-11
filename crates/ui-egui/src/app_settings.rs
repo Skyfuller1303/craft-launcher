@@ -7,6 +7,10 @@ use crate::widgets::{self, Kind};
 use artcraft_launcher_core::protocol::{AppPreferences, Command};
 use artcraft_launcher_core::{InstallSource, Os, PackageKind, platform::pick_asset};
 
+pub(crate) fn release_retry_delay(failures: u32, minimum: u64) -> u64 {
+    (5_u64 << failures.saturating_sub(1).min(4)).min(60).max(minimum)
+}
+
 pub(crate) struct Draft {
     pub app: String,
     tag: String,
@@ -34,8 +38,33 @@ impl LauncherUi {
         if entry.history_loading.is_some() {
             return;
         }
+        entry.history_retry = None;
         entry.history_loading = Some(page);
         self.send(Command::LoadReleases { app: id.to_string(), page, force });
+    }
+
+    pub(crate) fn retry_app_releases(&mut self, ctx: &egui::Context) {
+        let active = match &self.dialog {
+            Some(Dialog::AppSettings(id)) => Some(id.clone()),
+            _ => None,
+        };
+        let now = ctx.input(|i| i.time);
+        let mut retry = None;
+        for entry in &mut self.entries {
+            if active.as_deref() != Some(entry.app.id) {
+                entry.history_retry = None;
+                entry.history_failures = 0;
+            } else if let Some(pending) = &entry.history_retry {
+                if entry.history_loading.is_none() && now >= pending.at {
+                    retry = Some((entry.app.id, pending.page));
+                } else {
+                    ctx.request_repaint_after(std::time::Duration::from_secs_f64((pending.at - now).clamp(0.0, 60.0)));
+                }
+            }
+        }
+        if let Some((id, page)) = retry {
+            self.load_app_releases(id, page, true);
+        }
     }
 
     pub(crate) fn open_app_settings(&mut self, id: &str) {
@@ -56,7 +85,7 @@ impl LauncherUi {
             })
             .or_else(|| entry.release().map(|r| r.tag.clone()))
             .unwrap_or_default();
-        let load = entry.history_page == 0;
+        let load = entry.history_page == 0 || entry.history_error.is_some();
         let pin = preferences.pinned_tag.is_some() || !self.settings.apps.contains_key(id);
         self.app_settings = Some(Draft {
             app: id.to_string(),
@@ -175,6 +204,11 @@ impl LauncherUi {
                 });
                 if let Some(error) = &entry.history_error {
                     ui.colored_label(tokens.bad, msg(error));
+                }
+                if let Some(retry) = &entry.history_retry {
+                    let seconds = (retry.at - ui.ctx().input(|i| i.time)).max(0.0).ceil() as u64;
+                    ui.label(fmt(tl!("Retrying automatically in {seconds}s…"), &[("seconds", &seconds.to_string())]));
+                    ui.ctx().request_repaint_after(std::time::Duration::from_secs(1));
                 }
                 if entry.history_page > 0 && releases.is_empty() {
                     ui.label(tl!("No published releases are available."));
@@ -307,6 +341,9 @@ impl LauncherUi {
             });
         });
         if refresh {
+            if let Some(entry) = self.entries.iter_mut().find(|e| e.app.id == id) {
+                entry.history_failures = 0;
+            }
             self.load_app_releases(id, 1, true);
         }
         if more {
@@ -333,5 +370,133 @@ impl LauncherUi {
         }
         self.app_settings = Some(draft);
         close
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Host, Settings};
+    use artcraft_launcher_core::protocol::{Backend, Capabilities, Event, ReleaseError, ReleasePage};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    type Inbox = Rc<RefCell<Vec<Event>>>;
+    type Sent = Rc<RefCell<Vec<Command>>>;
+    struct Fake {
+        inbox: Inbox,
+        sent: Sent,
+    }
+    impl Backend for Fake {
+        fn send(&mut self, command: Command) {
+            self.sent.borrow_mut().push(command);
+        }
+        fn poll(&mut self) -> Vec<Event> {
+            std::mem::take(&mut *self.inbox.borrow_mut())
+        }
+        fn capabilities(&self) -> Capabilities {
+            Capabilities { manage_apps: true, reveal_label: "Show in Explorer", self_update: false }
+        }
+        fn platform(&self) -> Option<artcraft_launcher_core::Platform> {
+            None
+        }
+        fn now(&self) -> i64 {
+            1_791_500_000
+        }
+    }
+    struct NoHost;
+    impl Host for NoHost {}
+
+    fn setup() -> (LauncherUi, egui::Context, Inbox, Sent) {
+        let ctx = egui::Context::default();
+        let inbox = Rc::new(RefCell::new(Vec::new()));
+        let sent = Rc::new(RefCell::new(Vec::new()));
+        let ui = LauncherUi::new(&ctx, Box::new(Fake { inbox: inbox.clone(), sent: sent.clone() }), Settings::default());
+        (ui, ctx, inbox, sent)
+    }
+    fn tick(ui: &mut LauncherUi, ctx: &egui::Context, time: f64) {
+        let mut output = ctx.run_ui(egui::RawInput { time: Some(time), ..Default::default() }, |root| ui.logic(root.ctx(), &mut NoHost));
+        output.textures_delta.clear();
+    }
+    fn failure(page: u32, retry_after: Option<u64>) -> Event {
+        Event::Releases { app: "photocraft".into(), page, result: Err(ReleaseError { message: "GitHub answered HTTP 504".into(), retry_after }) }
+    }
+    fn loads(sent: &Sent) -> Vec<(u32, bool)> {
+        sent.borrow()
+            .iter()
+            .filter_map(|c| match c {
+                Command::LoadReleases { app, page, force } if app == "photocraft" => Some((*page, *force)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn release_history_retries_failed_page_with_backoff_until_success_and_keeps_existing_releases() {
+        let (mut ui, ctx, inbox, sent) = setup();
+        let entry = ui.entries.iter_mut().find(|e| e.app.id == "photocraft").unwrap();
+        entry.history_page = 1;
+        entry.releases.push(artcraft_launcher_core::Release { tag: "v0.7.0".into(), ..Default::default() });
+        ui.open_app_settings("photocraft");
+        ui.load_app_releases("photocraft", 2, false);
+        inbox.borrow_mut().push(failure(2, Some(0)));
+        tick(&mut ui, &ctx, 0.0);
+        assert_eq!(ui.entry("photocraft").unwrap().releases[0].tag, "v0.7.0");
+        tick(&mut ui, &ctx, 4.9);
+        assert_eq!(loads(&sent), [(2, false)]);
+        tick(&mut ui, &ctx, 5.0);
+        tick(&mut ui, &ctx, 6.0);
+        assert_eq!(loads(&sent), [(2, false), (2, true)]);
+        inbox.borrow_mut().push(failure(2, Some(0)));
+        tick(&mut ui, &ctx, 7.0);
+        tick(&mut ui, &ctx, 16.9);
+        assert_eq!(loads(&sent).len(), 2);
+        tick(&mut ui, &ctx, 17.0);
+        assert_eq!(loads(&sent).len(), 3);
+        inbox.borrow_mut().push(Event::Releases { app: "photocraft".into(), page: 2, result: Ok(ReleasePage::default()) });
+        tick(&mut ui, &ctx, 18.0);
+        tick(&mut ui, &ctx, 500.0);
+        let entry = ui.entry("photocraft").unwrap();
+        assert!(entry.history_error.is_none() && entry.history_retry.is_none());
+        assert_eq!(entry.releases[0].tag, "v0.7.0");
+        assert_eq!(entry.history_page, 2);
+        assert_eq!(loads(&sent).len(), 3);
+        assert_eq!((1..=8).map(|n| release_retry_delay(n, 0)).collect::<Vec<_>>(), [5, 10, 20, 40, 60, 60, 60, 60]);
+    }
+
+    #[test]
+    fn release_history_stops_retries_on_close_and_ignores_late_failure() {
+        let (mut ui, ctx, inbox, sent) = setup();
+        ui.open_app_settings("photocraft");
+        inbox.borrow_mut().push(failure(1, Some(0)));
+        tick(&mut ui, &ctx, 0.0);
+        ui.dialog = None;
+        tick(&mut ui, &ctx, 100.0);
+        assert_eq!(loads(&sent).len(), 1);
+        assert!(ui.entry("photocraft").unwrap().history_retry.is_none());
+        ui.open_app_settings("photocraft");
+        ui.dialog = None;
+        inbox.borrow_mut().push(failure(1, Some(0)));
+        tick(&mut ui, &ctx, 101.0);
+        tick(&mut ui, &ctx, 200.0);
+        assert_eq!(loads(&sent).len(), 2);
+        assert!(ui.entry("photocraft").unwrap().history_retry.is_none());
+    }
+
+    #[test]
+    fn release_history_respects_server_delay_and_does_not_retry_permanent_errors() {
+        let (mut ui, ctx, inbox, sent) = setup();
+        ui.open_app_settings("photocraft");
+        inbox.borrow_mut().push(failure(1, Some(120)));
+        tick(&mut ui, &ctx, 0.0);
+        tick(&mut ui, &ctx, 119.9);
+        assert_eq!(loads(&sent).len(), 1);
+        tick(&mut ui, &ctx, 120.0);
+        assert_eq!(loads(&sent).len(), 2);
+        inbox.borrow_mut().push(failure(1, None));
+        tick(&mut ui, &ctx, 121.0);
+        tick(&mut ui, &ctx, 1000.0);
+        assert_eq!(loads(&sent).len(), 2);
+        assert!(ui.entry("photocraft").unwrap().history_retry.is_none());
     }
 }

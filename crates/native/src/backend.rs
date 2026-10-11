@@ -269,7 +269,10 @@ impl NativeBackend {
                 };
                 Ok(artcraft_launcher_core::protocol::ReleasePage { releases, more: false })
             } else {
-                source.as_ref().ok_or_else(|| "secure connections aren't available".to_string()).and_then(|s| s.history(app.repo, page))
+                source
+                    .as_ref()
+                    .ok_or_else(|| artcraft_launcher_core::protocol::ReleaseError::from("secure connections aren't available"))
+                    .and_then(|s| s.history(app.repo, page))
             };
             if let Ok(result) = &result {
                 shared.history.lock().unwrap_or_else(PoisonError::into_inner).insert(key.clone(), (crate::now(), result.clone()));

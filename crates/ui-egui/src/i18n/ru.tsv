@@ -393,3 +393,4 @@ filter	Installed	Установлены
 @msg	The installed MSI version or folder does not match the expected app.	Версия или папка установленного MSI не соответствует ожидаемому приложению.
 @msg	MSI downgrade failed; the original version was restored. {details}	Откат MSI не удался; исходная версия восстановлена. {details}
 @msg	MSI downgrade failed; recovery also failed. {details}	Откат MSI и восстановление не удались. {details}
+	Retrying automatically in {seconds}s…	Автоматическая повторная попытка через {seconds} с…

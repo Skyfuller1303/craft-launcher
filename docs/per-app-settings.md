@@ -10,6 +10,14 @@ installed and latest releases. Older pages load on demand, up to 600 releases. D
 excluded; pre-releases are optional. Releases without compatible assets or verifiable
 versions cannot be installed. Refresh retries a failed request without changing installations.
 
+Transient server errors (500, 502, 503, 504), network timeouts and connection failures retry
+automatically while App settings stays open. A countdown shows the next attempt: 5, 10,
+20, 40, then 60 seconds between failures. GitHub's Retry-After or rate-limit reset takes
+precedence when it requires a longer wait. Existing releases stay visible during failures;
+the failed page is retried until it succeeds. Closing settings stops further requests.
+Permanent request, permission, certificate and malformed-response errors require manual
+action. Refresh remains available between attempts.
+
 Selecting a version edits a draft. **Switch to …** explicitly installs it, checks its published
 SHA-256, and confirms the installed version. **Keep the selected version** prevents automatic
 updates and **Update all** from replacing it. Preferences become active only after a successful
