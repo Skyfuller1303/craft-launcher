@@ -364,6 +364,7 @@ filter	Installed	Zainstalowane
 	This release has no published checksum.	To wydanie nie ma opublikowanej sumy kontrolnej.
 	This release's version cannot be verified.	Nie można zweryfikować wersji tego wydania.
 	An older version will replace the installed program.	Starsza wersja zastąpi zainstalowany program.
+	Keep the selected version	Zachowaj wybraną wersję
 	Automatic updates and Update all will leave this version unchanged.	Automatyczne aktualizacje i opcja Aktualizuj wszystko nie zmienią tej wersji.
 	Follow the latest release using the global update settings.	Korzystaj z najnowszego wydania zgodnie z globalnymi ustawieniami aktualizacji.
 	Switch to {version}	Zmień na {version}
@@ -373,6 +374,7 @@ filter	Installed	Zainstalowane
 	Package format	Format pakietu
 	System default	Domyślny systemowy
 	Choose a folder for a new installation	Wybierz folder dla nowej instalacji
+	Browse…	Przeglądaj…
 	Custom folders are available for portable ZIP packages.	Własne foldery są dostępne dla przenośnych pakietów ZIP.
 	Installation in progress. You can close this window.	Trwa instalacja. Możesz zamknąć to okno.
 	Save update preferences	Zapisz preferencje aktualizacji
@@ -386,8 +388,29 @@ filter	Installed	Zainstalowane
 @msg	The installation would overwrite an unrecorded file.	Instalacja nadpisałaby plik, którego nie ma w rejestrze instalacji.
 @msg	Choose an absolute installation folder without parent-directory components.	Wybierz bezwzględną ścieżkę folderu instalacji bez odwołań do folderu nadrzędnego.
 @msg	The portable executable does not match the selected version. The installation was rolled back.	Przenośny plik wykonywalny nie odpowiada wybranej wersji. Instalacja została wycofana.
+	MSI downgrade requires removing the current version first. You will confirm before it starts.	Instalacja starszej wersji MSI wymaga najpierw usunięcia bieżącej wersji. Zostaniesz poproszony o potwierdzenie.
+	Downgrade {name} to {version}?	Zmienić {name} na starszą wersję {version}?
+	Both MSI installers are downloaded and verified before anything is removed.	Oba instalatory MSI zostaną pobrane i zweryfikowane przed usunięciem czegokolwiek.
+	Windows will uninstall the current version, then install the selected version in the same folder. Administrator permission may be required.	Windows odinstaluje bieżącą wersję, a następnie zainstaluje wybraną wersję w tym samym folderze. Mogą być wymagane uprawnienia administratora.
+	If installation fails, the launcher will try to restore the original version. If recovery fails, it keeps the installers and shows their location.	Jeśli instalacja się nie powiedzie, program uruchamiający spróbuje przywrócić oryginalną wersję. Jeśli odzyskiwanie się nie powiedzie, zachowa instalatory i pokaże ich lokalizację.
+	Uninstall and switch	Odinstaluj i zmień wersję
+	Load the installed release before downgrading its MSI package.	Wczytaj zainstalowane wydanie przed instalacją starszej wersji jego pakietu MSI.
+@msg	Load the installed release before downgrading its MSI package.	Wczytaj zainstalowane wydanie przed instalacją starszej wersji jego pakietu MSI.
+	MSI downgrades require stable releases.	Instalacja starszej wersji MSI wymaga stabilnych wydań.
+@msg	Choose an older MSI release in App settings and confirm the downgrade.	Wybierz starsze wydanie MSI w ustawieniach aplikacji i potwierdź zmianę na starszą wersję.
+@msg	The installed release has no compatible recovery MSI.	Zainstalowane wydanie nie ma zgodnego pakietu MSI do odzyskiwania.
+@msg	Could not inspect the MSI package. Nothing was removed.	Nie udało się sprawdzić pakietu MSI. Niczego nie usunięto.
+@msg	The MSI packages do not match the installed app. Nothing was removed.	Pakiety MSI nie odpowiadają zainstalowanej aplikacji. Niczego nie usunięto.
+@msg	The installed MSI folder could not be verified. Nothing was removed.	Nie udało się zweryfikować folderu zainstalowanego pakietu MSI. Niczego nie usunięto.
+@msg	Both MSI releases need published checksums before downgrading.	Oba wydania MSI wymagają opublikowanych sum kontrolnych przed instalacją starszej wersji.
+@msg	The recovery MSI copy could not be verified. Nothing was removed.	Nie udało się zweryfikować kopii pakietu MSI do odzyskiwania. Niczego nie usunięto.
+@msg	The installed MSI version or folder does not match the expected app.	Wersja lub folder zainstalowanego pakietu MSI nie odpowiada oczekiwanej aplikacji.
+@msg	MSI downgrade failed; the original version was restored. {details}	Instalacja starszej wersji MSI nie powiodła się; przywrócono oryginalną wersję. {details}
+@msg	MSI downgrade failed; recovery also failed. {details}	Instalacja starszej wersji MSI nie powiodła się; odzyskiwanie również nie powiodło się. {details}
 	Retrying automatically in {seconds}s…	Automatyczna ponowna próba za {seconds}s…
 	Keep this version after switching	Zachowaj tę wersję po zmianie
+	MSI installation runs in the background. Windows may ask for administrator permission.	Instalacja MSI działa w tle. Windows może poprosić o uprawnienia administratora.
+@msg	Could not save the launcher update state. Update was not started.	Nie udało się zapisać stanu aktualizacji programu uruchamiającego. Aktualizacja nie została rozpoczęta.
 	Launcher version	Wersja programu uruchamiającego
 	Choose launcher version…	Wybierz wersję programu uruchamiającego…
 	Launcher MSI downgrades require a portable copy. This installation can upgrade only.	Instalacja starszej wersji MSI programu uruchamiającego wymaga kopii przenośnej. Ta instalacja obsługuje tylko aktualizacje do nowszych wersji.

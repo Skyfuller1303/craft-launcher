@@ -359,6 +359,7 @@ filter	Installed	Установлены
 	This release has no published checksum.	Для этого выпуска не опубликована контрольная сумма.
 	This release's version cannot be verified.	Невозможно проверить номер версии этого выпуска.
 	An older version will replace the installed program.	Более старая версия заменит установленную программу.
+	Keep the selected version	Сохранять выбранную версию
 	Automatic updates and Update all will leave this version unchanged.	Автообновления и «Обновить всё» не изменят эту версию.
 	Follow the latest release using the global update settings.	Следовать последнему выпуску согласно общим настройкам обновлений.
 	Switch to {version}	Перейти на {version}
@@ -368,6 +369,7 @@ filter	Installed	Установлены
 	Package format	Формат пакета
 	System default	По умолчанию в системе
 	Choose a folder for a new installation	Выбрать папку для новой установки
+	Browse…	Обзор…
 	Custom folders are available for portable ZIP packages.	Пользовательские папки доступны для переносимых ZIP-пакетов.
 	Installation in progress. You can close this window.	Идёт установка. Это окно можно закрыть.
 	Save update preferences	Сохранить настройки обновлений
@@ -387,8 +389,29 @@ filter	Installed	Установлены
 @msg	The portable executable does not match the selected version. The installation was rolled back.	Версия портативного файла не совпадает с выбранной. Установка отменена с восстановлением файлов.
 
 # Confirmed MSI version changes.
+	MSI downgrade requires removing the current version first. You will confirm before it starts.	Для отката MSI сначала нужно удалить текущую версию. Перед началом потребуется подтверждение.
+	Downgrade {name} to {version}?	Откатить {name} до {version}?
+	Both MSI installers are downloaded and verified before anything is removed.	Оба установщика MSI будут загружены и проверены до удаления.
+	Windows will uninstall the current version, then install the selected version in the same folder. Administrator permission may be required.	Windows удалит текущую версию и установит выбранную в ту же папку. Могут потребоваться права администратора.
+	If installation fails, the launcher will try to restore the original version. If recovery fails, it keeps the installers and shows their location.	При ошибке установки лаунчер попытается восстановить исходную версию. Если восстановление не удастся, установщики сохранятся и будет показано их расположение.
+	Uninstall and switch	Удалить и сменить версию
+	Load the installed release before downgrading its MSI package.	Загрузите выпуск установленной версии перед откатом её пакета MSI.
+@msg	Load the installed release before downgrading its MSI package.	Загрузите выпуск установленной версии перед откатом её пакета MSI.
+	MSI downgrades require stable releases.	Для отката MSI нужны стабильные выпуски.
+@msg	Choose an older MSI release in App settings and confirm the downgrade.	Выберите старый выпуск MSI в настройках приложения и подтвердите откат.
+@msg	The installed release has no compatible recovery MSI.	Для установленной версии нет совместимого MSI для восстановления.
+@msg	Could not inspect the MSI package. Nothing was removed.	Не удалось проверить пакет MSI. Ничего не удалено.
+@msg	The MSI packages do not match the installed app. Nothing was removed.	Пакеты MSI не соответствуют установленному приложению. Ничего не удалено.
+@msg	The installed MSI folder could not be verified. Nothing was removed.	Не удалось проверить папку установленного MSI. Ничего не удалено.
+@msg	Both MSI releases need published checksums before downgrading.	Для отката обоим выпускам MSI нужны опубликованные контрольные суммы.
+@msg	The recovery MSI copy could not be verified. Nothing was removed.	Не удалось проверить копию MSI для восстановления. Ничего не удалено.
+@msg	The installed MSI version or folder does not match the expected app.	Версия или папка установленного MSI не соответствует ожидаемому приложению.
+@msg	MSI downgrade failed; the original version was restored. {details}	Откат MSI не удался; исходная версия восстановлена. {details}
+@msg	MSI downgrade failed; recovery also failed. {details}	Откат MSI и восстановление не удались. {details}
 	Retrying automatically in {seconds}s…	Автоматическая повторная попытка через {seconds} с…
 	Keep this version after switching	Закрепить эту версию после переключения
+	MSI installation runs in the background. Windows may ask for administrator permission.	Установка MSI выполняется в фоновом режиме. Windows может запросить права администратора.
+@msg	Could not save the launcher update state. Update was not started.	Не удалось сохранить состояние обновления лаунчера. Обновление не запущено.
 	Launcher version	Версия лаунчера
 	Choose launcher version…	Выбрать версию лаунчера…
 	Launcher MSI downgrades require a portable copy. This installation can upgrade only.	Для понижения версии MSI лаунчера нужна переносная копия. Эта установка поддерживает только обновление.

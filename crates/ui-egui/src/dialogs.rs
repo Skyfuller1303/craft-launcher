@@ -25,6 +25,9 @@ impl LauncherUi {
         let response = match &dialog {
             Dialog::Notes(id) => modal.show(ctx, |ui| close = self.notes_dialog(ui, id)),
             Dialog::ConfirmUninstall(id) => modal.show(ctx, |ui| close = self.uninstall_dialog(ui, id)),
+            Dialog::ConfirmMsiDowngrade { app, tag, preferences } => {
+                modal.show(ctx, |ui| close = self.msi_downgrade_dialog(ui, app, tag, preferences))
+            }
             Dialog::Settings => modal.show(ctx, |ui| close = self.settings_dialog(ui, host)),
             Dialog::AppSettings(id) => modal.show(ctx, |ui| close = self.app_settings_dialog(ui, id)),
             Dialog::LauncherUpdate(r) => modal.show(ctx, |ui| close = self.launcher_update_dialog(ui, r)),
@@ -175,6 +178,61 @@ impl LauncherUi {
                     close = true;
                 }
             });
+        });
+        close
+    }
+
+    fn msi_downgrade_dialog(
+        &mut self,
+        ui: &mut egui::Ui,
+        id: &str,
+        tag: &str,
+        preferences: &artcraft_launcher_core::protocol::AppPreferences,
+    ) -> bool {
+        let Some(entry) = self.entry(id).cloned() else { return true };
+        ui.set_width(520.0f32.min((ui.ctx().content_rect().width() - 64.0).max(260.0)));
+        Self::title(ui, crate::icons::app(id), &fmt(tl!("Downgrade {name} to {version}?"), &[("name", entry.app.name), ("version", tag)]), "");
+        ui.label(fmt(tl!("Installed: {version}"), &[("version", &entry.installed_label().unwrap_or_default())]));
+        ui.add_space(8.0);
+        ui.label(tl!("Both MSI installers are downloaded and verified before anything is removed."));
+        ui.add_space(8.0);
+        ui.label(tl!("Windows will uninstall the current version, then install the selected version in the same folder. Administrator permission may be required."));
+        ui.add_space(8.0);
+        ui.label(tl!("MSI installation runs in the background. Windows may ask for administrator permission."));
+        ui.add_space(8.0);
+        ui.label(tl!("If installation fails, the launcher will try to restore the original version. If recovery fails, it keeps the installers and shows their location."));
+        ui.add_space(16.0);
+        let mut preferences = preferences.clone();
+        let mut pin = preferences.pinned_tag.is_some();
+        if ui.checkbox(&mut pin, tl!("Keep this version after switching")).changed() {
+            preferences.pinned_tag = pin.then(|| tag.to_string());
+            if let Some(draft) = self.app_settings.as_mut().filter(|draft| draft.app == id) {
+                draft.set_pin(pin);
+            }
+            self.dialog = Some(Dialog::ConfirmMsiDowngrade { app: id.to_string(), tag: tag.to_string(), preferences: preferences.clone() });
+        }
+        ui.label(if pin {
+            tl!("Automatic updates and Update all will leave this version unchanged.")
+        } else {
+            tl!("Follow the latest release using the global update settings.")
+        });
+        ui.add_space(16.0);
+        let mut close = false;
+        ui.horizontal(|ui| {
+            ui.add_enabled_ui(entry.job.is_none() && entry.installed.is_some(), |ui| {
+                if widgets::button(ui, tl!("Uninstall and switch"), Kind::Primary, 0.0).clicked() {
+                    self.send(Command::InstallRelease {
+                        app: id.to_string(),
+                        tag: tag.to_string(),
+                        preferences: preferences.clone(),
+                        confirmed_msi_downgrade: true,
+                    });
+                    close = true;
+                }
+            });
+            if widgets::button(ui, tl!("Cancel"), Kind::Secondary, 90.0).clicked() {
+                self.dialog = Some(Dialog::AppSettings(id.to_string()));
+            }
         });
         close
     }

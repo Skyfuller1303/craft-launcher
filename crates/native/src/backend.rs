@@ -48,8 +48,15 @@ const SERIOUS_FEED_OUTAGE: i64 = 60 * 60;
 const WORKERS: usize = 4;
 
 type Waker = Arc<dyn Fn() + Send + Sync>;
-type Requested = (Release, artcraft_launcher_core::protocol::AppPreferences);
+type Requested = (Release, artcraft_launcher_core::protocol::AppPreferences, bool);
 type Requests = HashMap<String, Requested>;
+
+#[derive(serde::Deserialize)]
+#[serde(untagged)]
+enum SavedRequest {
+    Current(Requested),
+    Legacy((Release, artcraft_launcher_core::protocol::AppPreferences)),
+}
 
 struct Shared {
     history: Mutex<HashMap<(String, u32), (i64, artcraft_launcher_core::protocol::ReleasePage)>>,
@@ -105,7 +112,7 @@ fn save_requests(path: &std::path::Path, requests: &Requests) -> Result<(), Stri
 /// Completed requests left by an interrupted shutdown must not override future updates.
 fn load_requests(paths: &Paths) -> Requests {
     let path = paths_for_requests(paths);
-    let requests: Requests = std::fs::metadata(&path)
+    let requests: HashMap<String, SavedRequest> = std::fs::metadata(&path)
         .ok()
         .filter(|m| m.len() <= 4 * 1024 * 1024)
         .and_then(|_| std::fs::read(&path).ok())
@@ -114,7 +121,16 @@ fn load_requests(paths: &Paths) -> Requests {
     let feed = load_feed(paths);
     requests
         .into_iter()
-        .filter(|(id, (release, preferences))| {
+        .map(|(id, saved)| {
+            (
+                id,
+                match saved {
+                    SavedRequest::Current(request) => request,
+                    SavedRequest::Legacy((release, preferences)) => (release, preferences, false),
+                },
+            )
+        })
+        .filter(|(id, (release, preferences, _))| {
             let Some(app) = CraftApp::by_id(id) else { return false };
             let prefix = artcraft_launcher_core::release::download_prefix(&feed_repo(feed.as_ref(), app));
             release.assets.iter().all(|asset| {
@@ -494,7 +510,7 @@ impl NativeBackend {
             // One installer call can cover several apps, and fail after some of them went in.
             let target = requested
                 .as_ref()
-                .map(|(r, _)| r.clone())
+                .map(|(r, _, _)| r.clone())
                 .or_else(|| shared.latest.lock().unwrap_or_else(PoisonError::into_inner).get(app.id).cloned());
             let result = match (result, target) {
                 (Err(e), Some(release))
@@ -507,7 +523,7 @@ impl NativeBackend {
             };
             let result = if !uninstall && requested.is_some() && result.is_ok() {
                 match requested.as_ref() {
-                    Some((release, preferences)) if exact_version_found(release, found.as_ref()) => {
+                    Some((release, preferences, _)) if exact_version_found(release, found.as_ref()) => {
                         shared.options.lock().unwrap_or_else(PoisonError::into_inner).apps.insert(app.id.to_string(), preferences.clone());
                         shared.emit(Event::VersionInstalled { app: app.id.to_string(), preferences: preferences.clone() });
                         Ok(installed_text(app, existing.is_some(), release))
@@ -631,10 +647,10 @@ fn run_install(
     let http = http.ok_or("secure connections aren't available on this system")?;
     let platform = platform.ok_or("this system isn't supported")?;
     let release = requested
-        .map(|(r, _)| r.clone())
+        .map(|(r, _, _)| r.clone())
         .or_else(|| shared.latest.lock().unwrap_or_else(PoisonError::into_inner).get(app.id).cloned())
         .ok_or("the latest release hasn't been found yet. Check for updates first.")?;
-    let preferences = requested.map(|(_, p)| p).or_else(|| options.apps.get(app.id));
+    let preferences = requested.map(|(_, p, _)| p).or_else(|| options.apps.get(app.id));
     if requested.is_some() && release.version.is_none() {
         return Err("This release's version cannot be verified.".into());
     }
@@ -663,6 +679,33 @@ fn run_install(
         shared.emit(Event::Progress { app: app.id.to_string(), phase: p });
     };
     let mut job = Job { http, paths, stop, phase: &mut phase };
+    #[cfg(windows)]
+    if kind == PackageKind::Msi
+        && let Some(existing) =
+            existing.filter(|i| release.version.as_ref().zip(i.version.as_ref()).is_some_and(|(target, current)| target < current))
+    {
+        if !requested.is_some_and(|(_, _, confirmed)| *confirmed) {
+            return Err("Choose an older MSI release in App settings and confirm the downgrade.".into());
+        }
+        // An older MSI cannot replace a newer one directly. Before removing anything,
+        // prepare the exact original release as a verified recovery installer.
+        let recovery = shared
+            .history
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .iter()
+            .filter(|((id, _), _)| id == app.id)
+            .flat_map(|(_, (_, page))| &page.releases)
+            .find(|r| r.version.is_some() && r.version == existing.version)
+            .cloned();
+        let recovery = recovery
+            .or_else(|| shared.latest.lock().unwrap_or_else(PoisonError::into_inner).get(app.id).filter(|r| r.version == existing.version).cloned())
+            .ok_or("Load the installed release before downgrading its MSI package.")?;
+        let (recovery_asset, _) = planned_asset(app, &recovery, platform, &selected_options, Some(existing), record)
+            .ok_or("The installed release has no compatible recovery MSI.")?;
+        crate::msi_switch::install(app, &release, &asset, &recovery, &recovery_asset, existing, &mut job)?;
+        return Ok(installed_text(app, true, &release));
+    }
     let directory = preferences.and_then(|p| p.install_dir.as_deref()).map(std::path::Path::new);
     let mut record_saved = false;
     let new_record = {
@@ -708,7 +751,7 @@ fn exact_version_found(release: &Release, found: Option<&Installed>) -> bool {
 
 fn downgrade_blocked(kind: PackageKind, release: &Release, existing: Option<&Installed>) -> bool {
     let downgrade = release.version.as_ref().zip(existing.and_then(|i| i.version.as_ref())).is_some_and(|(target, current)| target < current);
-    downgrade && matches!(kind, PackageKind::Msi | PackageKind::Rpm | PackageKind::Flatpak)
+    downgrade && (matches!(kind, PackageKind::Rpm | PackageKind::Flatpak) || kind == PackageKind::Msi && !cfg!(windows))
 }
 
 /// Whether an install whose job failed with `error` went in all the same. Only a failed call
@@ -810,13 +853,15 @@ fn planned_download(
     options: &BackendOptions,
 ) -> Option<(std::path::PathBuf, u64)> {
     let requested = shared.requested.lock().unwrap_or_else(PoisonError::into_inner).get(app.id).cloned();
-    let release =
-        requested.as_ref().map(|(r, _)| r.clone()).or_else(|| shared.latest.lock().unwrap_or_else(PoisonError::into_inner).get(app.id).cloned())?;
+    let release = requested
+        .as_ref()
+        .map(|(r, _, _)| r.clone())
+        .or_else(|| shared.latest.lock().unwrap_or_else(PoisonError::into_inner).get(app.id).cloned())?;
     let mut options = options.clone();
-    if let Some((_, preferences)) = &requested {
+    if let Some((_, preferences, _)) = &requested {
         options.apps.insert(app.id.to_string(), preferences.clone());
     }
-    if let Some(package) = requested.as_ref().and_then(|(_, p)| p.package).or_else(|| options.apps.get(app.id).and_then(|p| p.package)) {
+    if let Some(package) = requested.as_ref().and_then(|(_, p, _)| p.package).or_else(|| options.apps.get(app.id).and_then(|p| p.package)) {
         options.kinds = vec![package];
     }
     let existing = shared.installed.lock().unwrap_or_else(PoisonError::into_inner).get(app.id).cloned();
@@ -1117,7 +1162,7 @@ impl Backend for NativeBackend {
             Command::CheckForUpdates { force } => self.check(force),
             Command::Detect => self.detect_all(),
             Command::LoadReleases { app, page, force } => self.load_releases(&app, page, force),
-            Command::InstallRelease { app, tag, preferences } => {
+            Command::InstallRelease { app, tag, preferences, confirmed_msi_downgrade } => {
                 let selected = self
                     .shared
                     .history
@@ -1149,7 +1194,7 @@ impl Backend for NativeBackend {
                         }
                         self.update_launcher(Some((release, preferences)));
                     } else {
-                        self.start_job(&app, false, Some((release, preferences)));
+                        self.start_job(&app, false, Some((release, preferences, confirmed_msi_downgrade)));
                     }
                 } else {
                     self.shared.emit(Event::JobFinished { app, result: Err("Reload the release list before selecting a version.".into()) });
@@ -1171,7 +1216,7 @@ impl Backend for NativeBackend {
                         .cloned()
                         .or_else(|| self.shared.latest.lock().unwrap_or_else(PoisonError::into_inner).get(&app).filter(|r| &r.tag == tag).cloned());
                     match release {
-                        Some(release) => self.start_job(&app, false, Some((release, preferences))),
+                        Some(release) => self.start_job(&app, false, Some((release, preferences, false))),
                         None => self.shared.emit(Event::JobFinished {
                             app,
                             result: Err("This app is pinned to a selected version. Open its settings to change versions.".into()),
@@ -1586,7 +1631,7 @@ mod tests {
         for kind in [PackageKind::Rpm, PackageKind::Flatpak] {
             assert!(downgrade_blocked(kind, &release, Some(&copy("0.5.0"))));
         }
-        assert!(downgrade_blocked(PackageKind::Msi, &release, Some(&copy("0.5.0"))));
+        assert_eq!(downgrade_blocked(PackageKind::Msi, &release, Some(&copy("0.5.0"))), !cfg!(windows));
         for kind in [PackageKind::PortableZip, PackageKind::AppImage, PackageKind::Deb, PackageKind::Dmg] {
             assert!(!downgrade_blocked(kind, &release, Some(&copy("0.5.0"))));
         }
@@ -1600,16 +1645,23 @@ mod tests {
         let backend = backend(dir.path(), platform, None);
         let prefs = artcraft_launcher_core::protocol::AppPreferences { pinned_tag: Some("v0.4.0".into()), ..Default::default() };
         let selected = Release { tag: "v0.4.0".into(), version: version::parse("0.4.0"), ..release("0.4.0") };
-        backend.shared.requested.lock().unwrap().insert(APP.into(), (selected, prefs));
+        backend.shared.requested.lock().unwrap().insert(APP.into(), (selected, prefs, true));
         let saved = keep_file(&backend);
         save_requests(&paths_for_requests(&backend.paths), &backend.shared.requested.lock().unwrap()).unwrap();
         let restored = load_requests(&backend.paths);
         assert_eq!(restored[APP].0.tag, "v0.4.0");
+        assert!(restored[APP].2, "explicit MSI confirmation survives resuming the selected job");
         *backend.shared.requested.lock().unwrap() = restored;
         let (planned, _) =
             planned_download(CraftApp::by_id(APP).unwrap(), &backend.shared, &backend.paths, Some(platform), &BackendOptions::default()).unwrap();
         assert_eq!(planned, saved);
         assert!(planned.file_name().unwrap().to_string_lossy().contains("0.4.0"));
+        let request = backend.shared.requested.lock().unwrap().get(APP).cloned().unwrap();
+        let legacy = [(APP, (request.0, request.1))].into_iter().collect::<HashMap<_, _>>();
+        std::fs::write(paths_for_requests(&backend.paths), serde_json::to_vec(&legacy).unwrap()).unwrap();
+        let legacy = load_requests(&backend.paths);
+        assert_eq!(legacy[APP].0.tag, "v0.4.0");
+        assert!(!legacy[APP].2, "old pending jobs do not imply MSI downgrade confirmation");
         std::fs::remove_file(saved).unwrap();
         assert!(load_requests(&backend.paths).is_empty());
     }
@@ -1621,7 +1673,7 @@ mod tests {
         let backend = backend(dir.path(), platform, None);
         let selected = release("0.4.0");
         let preferences = artcraft_launcher_core::protocol::AppPreferences::default();
-        backend.shared.requested.lock().unwrap().insert(APP.into(), (selected.clone(), preferences.clone()));
+        backend.shared.requested.lock().unwrap().insert(APP.into(), (selected.clone(), preferences.clone(), false));
         keep_file(&backend);
         for url in [
             "https://example.invalid/photocraft.msi",
@@ -1630,12 +1682,43 @@ mod tests {
         ] {
             let mut tampered = selected.clone();
             tampered.assets[0].url = url.into();
-            let requests = [(APP.into(), (tampered, preferences.clone()))].into_iter().collect();
+            let requests = [(APP.into(), (tampered, preferences.clone(), false))].into_iter().collect();
             save_requests(&paths_for_requests(&backend.paths), &requests).unwrap();
             assert!(load_requests(&backend.paths).is_empty(), "{url}");
         }
         save_requests(&paths_for_requests(&backend.paths), &backend.shared.requested.lock().unwrap()).unwrap();
         assert_eq!(load_requests(&backend.paths).len(), 1);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn an_unconfirmed_msi_downgrade_stops_before_downloading_or_removing_anything() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = Paths::under(dir.path());
+        let http = Http::new().unwrap();
+        let app = CraftApp::by_id(APP).unwrap();
+        let mut selected = release("0.6.0");
+        selected.version = version::parse("0.6.0");
+        selected.tag = "v0.6.0".into();
+        for asset in &mut selected.assets {
+            asset.sha256 = Some("a".repeat(64));
+        }
+        let installed = Installed { source: InstallSource::Msi, ..copy("0.7.0") };
+        let request = (selected, artcraft_launcher_core::protocol::AppPreferences::default(), false);
+        let result = run_install(
+            app,
+            &shared(),
+            &paths,
+            Some(&http),
+            Some(Platform { os: Os::Windows, arch: Arch::X64 }),
+            &BackendOptions::default(),
+            Some(&installed),
+            None,
+            &Stop::default(),
+            Some(&request),
+        );
+        assert_eq!(result.unwrap_err(), "Choose an older MSI release in App settings and confirm the downgrade.");
+        assert!(!paths.downloads().exists());
     }
 
     #[cfg(windows)]
@@ -1693,10 +1776,20 @@ mod tests {
         b.shared.history.lock().unwrap().insert((LAUNCHER_ID.into(), 1), (crate::now(), page.clone()));
         b.send(Command::LoadReleases { app: LAUNCHER_ID.into(), page: 1, force: false });
         assert_eq!(b.poll(), vec![Event::Releases { app: LAUNCHER_ID.into(), page: 1, result: Ok(page) }]);
-        b.send(Command::InstallRelease { app: LAUNCHER_ID.into(), tag: "v0.0.1".into(), preferences: AppPreferences::default() });
+        b.send(Command::InstallRelease {
+            app: LAUNCHER_ID.into(),
+            tag: "v0.0.1".into(),
+            preferences: AppPreferences::default(),
+            confirmed_msi_downgrade: true,
+        });
         assert!(matches!(b.poll().as_slice(), [Event::JobFinished { app, result: Err(e) }] if app == LAUNCHER_ID && e.contains("MSI downgrades")));
         assert!(b.shared.jobs.lock().unwrap().is_empty());
-        b.send(Command::InstallRelease { app: LAUNCHER_ID.into(), tag: "v99.0.0".into(), preferences: AppPreferences::default() });
+        b.send(Command::InstallRelease {
+            app: LAUNCHER_ID.into(),
+            tag: "v99.0.0".into(),
+            preferences: AppPreferences::default(),
+            confirmed_msi_downgrade: false,
+        });
         assert!(matches!(b.poll().as_slice(), [Event::JobFinished { result: Err(e), .. }] if e.contains("Reload the release list")));
         b.shared
             .options

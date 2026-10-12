@@ -131,7 +131,7 @@ fn setup_launcher(source: InstallSource, enabled: bool, settings: Settings) -> (
 
 #[test]
 fn launcher_settings_choose_exact_release_without_installing_or_pinning_the_draft() {
-    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let (mut h, sent, inbox) = setup_launcher(InstallSource::Launcher, true, Settings { language: "en".into(), ..Settings::default() });
     h.run_steps(5);
     h.get_by_label("Settings").click();
@@ -164,7 +164,7 @@ fn launcher_settings_choose_exact_release_without_installing_or_pinning_the_draf
 
 #[test]
 fn launcher_msi_blocks_downgrades_but_can_select_upgrades_and_disable_pinning() {
-    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let (mut h, sent, _) = setup_launcher(InstallSource::Msi, true, Settings { language: "en".into(), ..Settings::default() });
     h.run_steps(5);
     h.get_by_label("Settings").click();
@@ -178,7 +178,7 @@ fn launcher_msi_blocks_downgrades_but_can_select_upgrades_and_disable_pinning() 
     h.get_by_label("Switch to v0.1.0").click();
     h.run_steps(2);
     assert!(!sent.borrow().iter().any(|c| matches!(c, Command::InstallRelease { .. })));
-    h.get_by_label("This package cannot downgrade here. Use a portable installation instead.");
+    h.get_by_label("Launcher MSI downgrades require a portable copy. This installation can upgrade only.");
     h.get_by_value("v0.1.0").click();
     h.run_steps(3);
     h.get_by_label("v0.3.0").click();
@@ -193,7 +193,7 @@ fn launcher_msi_blocks_downgrades_but_can_select_upgrades_and_disable_pinning() 
 
 #[test]
 fn launcher_development_instance_lists_releases_but_cannot_replace_itself() {
-    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let (mut h, sent, _) = setup_launcher(InstallSource::Launcher, false, Settings { language: "en".into(), ..Settings::default() });
     h.run_steps(5);
     h.get_by_label("Settings").click();
@@ -212,7 +212,7 @@ fn launcher_development_instance_lists_releases_but_cannot_replace_itself() {
 
 #[test]
 fn launcher_pin_suppresses_auto_update_and_is_applied_only_after_actual_restart() {
-    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let id = artcraft_launcher_core::catalog::LAUNCHER_ID;
     let pin = AppPreferences { pinned_tag: Some("v0.2.1".into()), ..AppPreferences::default() };
     for success in [false, true] {
@@ -291,7 +291,7 @@ fn open(h: &mut Harness<'_, Option<LauncherUi>>, label: &str) {
 
 #[test]
 fn release_history_retry_countdown_and_close_remain_visible_in_english_and_german() {
-    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     for (language, settings_label, countdown, close, filename) in [
         ("en", "App settings…", "Retrying automatically in 120s…", "Close", "releases-retry-en"),
         ("de", "App-Einstellungen…", "Automatischer neuer Versuch in 120s…", "Schließen", "releases-retry-de"),
@@ -311,7 +311,7 @@ fn release_history_retry_countdown_and_close_remain_visible_in_english_and_germa
 
 #[test]
 fn choosing_a_downgrade_waits_for_explicit_action_and_commits_only_after_success() {
-    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     for view in [ViewMode::Grid, ViewMode::Table] {
         let (mut h, sent, inbox) = setup(Settings { view, language: "en".into(), notify: false, ..Settings::default() }, true);
         h.run_steps(5);
@@ -373,7 +373,7 @@ fn choosing_a_downgrade_waits_for_explicit_action_and_commits_only_after_success
 
 #[test]
 fn pin_survives_restart_and_blocks_update_all_and_automatic_updates() {
-    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let mut settings = Settings { language: "en".into(), auto_update: true, notify: false, ..Settings::default() };
     settings.apps.insert("photocraft".into(), AppPreferences { pinned_tag: Some("v0.6.0".into()), ..AppPreferences::default() });
     let settings: Settings = serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
@@ -399,7 +399,7 @@ fn pin_survives_restart_and_blocks_update_all_and_automatic_updates() {
 
 #[test]
 fn german_version_settings_fit_and_closing_discards_the_draft() {
-    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let (mut h, sent, _) = setup(Settings { language: "de".into(), notify: false, ..Settings::default() }, true);
     h.run_steps(5);
     open(&mut h, "App-Einstellungen…");
@@ -416,7 +416,7 @@ fn german_version_settings_fit_and_closing_discards_the_draft() {
 
 #[test]
 fn a_new_portable_install_uses_its_text_folder_draft() {
-    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let (mut h, sent, _) = setup(Settings { language: "en".into(), notify: false, ..Settings::default() }, false);
     h.run_steps(5);
     open(&mut h, "App settings…");
@@ -442,7 +442,7 @@ fn a_new_portable_install_uses_its_text_folder_draft() {
 
 #[test]
 fn table_keeps_the_vertical_menu_beside_open_in_narrow_windows() {
-    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     for width in [720.0, 960.0, 1120.0, 1180.0] {
         for language in ["en", "de"] {
             let mut settings = Settings { view: ViewMode::Table, language: language.into(), notify: false, ..Settings::default() };
@@ -467,8 +467,8 @@ fn table_keeps_the_vertical_menu_beside_open_in_narrow_windows() {
 }
 
 #[test]
-fn an_msi_downgrade_is_blocked_without_installing_or_changing_preferences() {
-    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+fn an_msi_downgrade_is_enabled_but_requires_confirmation_and_supports_cancel() {
+    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     for language in ["en", "de"] {
         let (mut h, sent, inbox) = setup(Settings { language: language.into(), notify: false, ..Settings::default() }, true);
         inbox.borrow_mut().push(Event::Detected {
@@ -491,18 +491,37 @@ fn an_msi_downgrade_is_blocked_without_installing_or_changing_preferences() {
         h.get_by_label(switch).click();
         h.run_steps(3);
         assert!(!sent.borrow().iter().any(|c| matches!(c, Command::InstallRelease { .. })));
+        snapshot(&mut h, &format!("msi-downgrade-confirmation-{language}"));
+        let pin = if language == "de" { "Version nach Wechsel festhalten" } else { "Keep this version after switching" };
+        h.get_by_label(pin).click();
+        h.run_steps(3);
+        assert!(h.state().as_ref().unwrap().settings.apps.is_empty());
+        h.get_by_label(if language == "de" { "Abbrechen" } else { "Cancel" }).click();
+        h.run_steps(3);
+        assert!(!sent.borrow().iter().any(|c| matches!(c, Command::InstallRelease { .. })));
+        snapshot(&mut h, &format!("msi-cancelled-settings-{language}"));
+        h.get_by_label(switch).click();
+        h.run_steps(3);
+        snapshot(&mut h, &format!("msi-second-confirmation-{language}"));
         h.get_by_label(if language == "de" {
-            "Dieses Paket unterstützt hier kein Downgrade. Verwende eine portable Installation."
+            "Neuester Version gemäß globalen Update-Einstellungen folgen."
         } else {
-            "This package cannot downgrade here. Use a portable installation instead."
+            "Follow the latest release using the global update settings."
         });
+        h.get_by_label(if language == "de" { "Deinstallieren und wechseln" } else { "Uninstall and switch" }).click();
+        h.run_steps(3);
+        assert!(
+            sent.borrow().iter().any(
+                |c| matches!(c, Command::InstallRelease { app, tag, preferences, confirmed_msi_downgrade: true } if app == "photocraft" && tag == "v0.6.0" && preferences.pinned_tag.is_none())
+            )
+        );
         assert!(h.state().as_ref().unwrap().settings.apps.is_empty());
     }
 }
 
 #[test]
 fn switching_can_pin_or_follow_updates_for_both_upgrade_and_downgrade() {
-    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     for tag in ["v0.7.0", "v0.5.0"] {
         for pin in [true, false] {
             let (mut h, sent, inbox) = setup(Settings { language: "en".into(), notify: false, ..Settings::default() }, true);

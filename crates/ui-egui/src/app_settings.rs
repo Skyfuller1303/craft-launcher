@@ -23,6 +23,10 @@ pub(crate) struct Draft {
 }
 
 impl Draft {
+    pub(crate) fn set_pin(&mut self, pin: bool) {
+        self.pin = pin;
+    }
+
     fn preferences(&self) -> AppPreferences {
         AppPreferences {
             pinned_tag: self.pin.then(|| self.tag.clone()),
@@ -156,6 +160,8 @@ impl LauncherUi {
         let current = entry.installed.as_ref().and_then(|i| i.version.as_ref());
         let mut can_install = false;
         let mut same_version = false;
+        let mut msi_downgrade = false;
+        let mut msi_package = false;
         egui::ScrollArea::vertical().max_height(ui.ctx().content_rect().height() * 0.55).show(ui, |ui| {
             if !draft.installation_tab {
                 ui.label(fmt(
@@ -214,28 +220,51 @@ impl LauncherUi {
                 selected = releases.iter().find(|r| r.tag == draft.tag).cloned();
                 if let Some(release) = &selected {
                     let asset = self.platform.and_then(|p| pick_asset(release, &stems, p, &kinds));
+                    msi_package = asset.is_some_and(|(_, kind)| kind == PackageKind::Msi);
                     same_version = release.version.as_ref().is_some_and(|v| Some(v) == current);
                     let downgrade = release.version.as_ref().zip(current).is_some_and(|(target, current)| target < current);
-                    let blocked =
-                        downgrade && asset.is_some_and(|(_, kind)| matches!(kind, PackageKind::Msi | PackageKind::Rpm | PackageKind::Flatpak));
+                    msi_downgrade = !launcher && downgrade && asset.is_some_and(|(_, kind)| kind == PackageKind::Msi);
+                    let blocked = downgrade
+                        && asset
+                            .is_some_and(|(_, kind)| matches!(kind, PackageKind::Rpm | PackageKind::Flatpak) || launcher && kind == PackageKind::Msi);
+                    let recovery_available = !msi_downgrade
+                        || releases.iter().any(|r| {
+                            r.version.as_ref().is_some_and(|v| Some(v) == current)
+                                && self
+                                    .platform
+                                    .and_then(|p| pick_asset(r, &stems, p, &[PackageKind::Msi]))
+                                    .is_some_and(|(a, _)| a.sha256.is_some() || r.sums_asset().is_some())
+                        });
+                    let stable_msi = !msi_downgrade
+                        || release.version.as_ref().zip(current).is_some_and(|(target, current)| target.pre.is_empty() && current.pre.is_empty());
                     let checksums = asset.is_some_and(|(asset, _)| asset.sha256.is_some() || release.sums_asset().is_some());
                     can_install = asset.is_some()
                         && checksums
                         && !blocked
+                        && recovery_available
+                        && stable_msi
                         && !same_version
                         && release.version.is_some()
                         && (!draft.custom || !draft.directory.trim().is_empty())
                         && (draft.prereleases || !release.prerelease && release.version.as_ref().is_none_or(|v| v.pre.is_empty()));
-                    if blocked {
+                    if blocked && launcher && msi_package {
+                        ui.label(tl!("Launcher MSI downgrades require a portable copy. This installation can upgrade only."));
+                    } else if blocked {
                         ui.label(tl!("This package cannot downgrade here. Use a portable installation instead."));
+                    } else if !recovery_available {
+                        ui.label(tl!("Load the installed release before downgrading its MSI package."));
+                    } else if !stable_msi {
+                        ui.label(tl!("MSI downgrades require stable releases."));
                     } else if asset.is_none() {
                         ui.label(tl!("No compatible download for this release."));
                     } else if !checksums {
                         ui.label(tl!("This release has no published checksum."));
                     } else if release.version.is_none() {
                         ui.label(tl!("This release's version cannot be verified."));
+                    } else if msi_downgrade {
+                        ui.label(tl!("MSI downgrade requires removing the current version first. You will confirm before it starts."));
                     }
-                    if downgrade && !blocked {
+                    if downgrade && !blocked && !msi_downgrade {
                         ui.label(tl!("An older version will replace the installed program."));
                     }
                     widgets::hud_link(ui, tl!("Release notes"), &release.html_url);
@@ -250,6 +279,10 @@ impl LauncherUi {
                     tl!("Follow the latest release using the global update settings.")
                 });
                 ui.add_space(12.0);
+                if msi_package {
+                    ui.label(tl!("MSI installation runs in the background. Windows may ask for administrator permission."));
+                    ui.add_space(8.0);
+                }
                 let label = fmt(tl!("Switch to {version}"), &[("version", &draft.tag)]);
                 if launcher {
                     ui.label(tl!("The launcher will wait for other installs, switch versions and restart."));
@@ -343,7 +376,16 @@ impl LauncherUi {
             self.settings.apps.insert(id.to_string(), draft.preferences());
         }
         if install && let Some(release) = selected {
-            self.send(Command::InstallRelease { app: id.to_string(), tag: release.tag, preferences: draft.preferences() });
+            if msi_downgrade {
+                self.dialog = Some(Dialog::ConfirmMsiDowngrade { app: id.to_string(), tag: release.tag, preferences: draft.preferences() });
+            } else {
+                self.send(Command::InstallRelease {
+                    app: id.to_string(),
+                    tag: release.tag,
+                    preferences: draft.preferences(),
+                    confirmed_msi_downgrade: false,
+                });
+            }
         }
         self.app_settings = Some(draft);
         close

@@ -39,12 +39,29 @@ folder; user-managed AppImages elsewhere are left alone.
 | Format | Version changes | Custom folder |
 | --- | --- | --- |
 | Windows portable ZIP | Upgrade and downgrade; executable VERSIONINFO must match the selected release | New installations only |
-| Windows MSI | Upgrade only; downgrade blocked | Installer-managed |
+| Windows MSI | Upgrade; confirmed stable-release downgrade with verified recovery installer | Installer-managed; downgrade preserves the existing folder |
 | macOS DMG | Existing bundle replacement and version checks | Existing application location |
 | Linux AppImage | Replace verified download in ~/Applications | Standard folder |
 | Linux DEB | Existing apt installation, including its downgrade support | System-managed |
 | Linux RPM / Flatpak | Upgrade; downgrade blocked | System-managed |
 | FreeBSD tarball | Existing installer path | Existing prefix |
+
+MSI downgrades require both the selected and installed releases to be loaded with compatible,
+checksummed MSI assets. **Switch to …** opens a confirmation; **Uninstall and switch** starts
+preparation. Both installers are verified and copied into the portable data's `msi-recovery`
+folder before removal. Their app identity, product/upgrade codes, versions, architecture,
+installation scope and directory property must match the installed app. The original MSI is
+then removed and the target installed at the same location. Failed installation or version
+checks trigger a separate attempt to restore the original version. Recovery failure retains
+the installers, a recovery record and installer log, and reports their folder. A dismissed
+administrator prompt or power loss can prevent recovery; rollback is not guaranteed.
+
+Tool MSI installations, version changes and recovery run in the background with `/qn /norestart`.
+Windows may still request administrator permission for per-machine packages. Per-user packages
+do not request extra elevation; mixed installation scopes require an interactive installer or
+portable package. The MSI downgrade confirmation also lets you choose whether to keep the target
+version after switching. Cancelling does not save preferences; returning to App settings retains
+the checkbox choice in its draft. Separate uninstall actions are unchanged.
 
 ## Launcher self-update
 
@@ -61,14 +78,19 @@ installed release with **Save update preferences** prevents automatic launcher u
 unchecking it returns to the global update policy. Older releases may not understand these
 new preferences, so pinning cannot be guaranteed after downgrading into them.
 
-Launcher MSI installations support upgrades only: the running
+Launcher MSI installations support upgrades only: unlike tool MSI downgrades, the running
 launcher cannot coordinate its own removal/recovery. Use a portable copy for launcher
 downgrades. Portable ZIP, macOS app, Linux AppImage and DEB replacement support older releases;
 RPM downgrades remain blocked. Development and externally managed copies cannot switch in place.
 
-The global **Automatic updates** setting also updates the launcher unless its version is pinned.
-Every installation requires a published checksum. Windows MSI self-update retains the existing
-/passive progress window; quiet installation and MSI downgrade recovery are separate changes.
+The global **Automatic updates** setting also updates the launcher unless its version is pinned. It downloads and
+verifies the new release, waits for other jobs to finish, then restarts. Windows MSI self-update
+now uses the same quiet MSI argument builder, with no installer window or forced reboot. The
+restart helper waits for the old process to exit before installing. Installation failure keeps
+the MSI and log, blocks the same release for ten minutes to prevent a restart loop, and attempts
+to restart the existing launcher. It can be offered again on an update check after that cooldown.
+Every installation requires a published checksum; a launcher self-update also requires a saved update guard.
+Development and externally managed instances cannot self-update.
 
 Windows portable replacement backs up recorded program files and rolls back on copy,
 version-verification or manifest-save errors. Unrecorded settings and documents are preserved,

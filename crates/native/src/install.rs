@@ -1205,7 +1205,7 @@ pub mod windows {
         std::env::var_os("SystemRoot").map_or_else(|| PathBuf::from(r"C:\Windows"), PathBuf::from).join(r"System32\msiexec.exe")
     }
 
-    fn explain(code: Option<i32>) -> Result<(), String> {
+    pub(crate) fn explain(code: Option<i32>) -> Result<(), String> {
         match code {
             Some(0 | 3010 | 1641) => Ok(()),
             Some(1602) => Err("cancelled".into()),
@@ -1216,22 +1216,19 @@ pub mod windows {
         }
     }
 
-    /// Runs an MSI with a progress window and no restart. Windows asks for permission itself.
+    /// Runs an MSI without an installer window or restart. Per-machine packages ask for elevation.
     pub fn run_msi(msi: &Path, stop: &Stop, phase: &mut dyn FnMut(JobPhase)) -> Result<(), String> {
-        in_turn(stop, phase, JobPhase::Installing, || {
-            let status = process::command(msiexec())
-                .arg("/i")
-                .arg(msi)
-                .args(["/passive", "/norestart"])
-                .status()
-                .map_err(|e| format!("couldn't start the Windows Installer ({e})"))?;
-            explain(status.code())
-        })
+        in_turn(stop, phase, JobPhase::Installing, || crate::windows_msi::run("/i", msi.as_os_str(), &msi.with_extension("msi.log"), None))
     }
 
     /// Runs `work` once no other Windows Installer job of ours is running (a second one would
     /// stop with error 1618). Cancelled while it waits, it never runs.
-    fn in_turn(stop: &Stop, phase: &mut dyn FnMut(JobPhase), working: JobPhase, work: impl FnOnce() -> Result<(), String>) -> Result<(), String> {
+    pub(crate) fn in_turn(
+        stop: &Stop,
+        phase: &mut dyn FnMut(JobPhase),
+        working: JobPhase,
+        work: impl FnOnce() -> Result<(), String>,
+    ) -> Result<(), String> {
         INSTALLER.alone(&cancelled(stop), &mut turn(phase, working), work).unwrap_or_else(|| Err(CANCELLED.into()))
     }
 
