@@ -338,6 +338,9 @@ figcraft	Interface design and prototyping	界面设计与原型制作
 	Open installation folder	打开安装文件夹
 	Version changes keep the existing installation folder and package format.	切换版本会保留现有安装文件夹和软件包格式。
 	Package format	软件包格式
+	System default	系统默认
+	Choose a folder for a new installation	为新安装选择文件夹
+	Custom folders are available for portable ZIP packages.	便携式 ZIP 软件包可使用自定义文件夹。
 	Installation in progress. You can close this window.	正在安装。您可以关闭此窗口。
 	Save update preferences	保存更新偏好
 
@@ -348,8 +351,12 @@ figcraft	Interface design and prototyping	界面设计与原型制作
 @msg	This release has no published checksum for this download.	此下载没有已发布的校验和。
 @msg	This package format cannot safely downgrade here. Use a portable installation instead.	此软件包格式不支持在此安全降级。请使用便携式安装。
 @msg	The installer finished, but the selected version could not be confirmed. Check the installed version before retrying.	安装程序已完成，但无法确认所选版本。重试前请检查已安装版本。
+@msg	Custom folders are supported for portable ZIP installations only.	仅便携式 ZIP 安装支持自定义文件夹。
+@msg	The installation would overwrite an unrecorded file.	安装将覆盖未记录的文件。
+@msg	Choose an absolute installation folder without parent-directory components.	请选择不含父目录组件的绝对安装路径。
 
 # Version management messages.
+@msg	The portable executable does not match the selected version. The installation was rolled back.	便携式可执行文件与所选版本不符。安装已回滚。
 
 # Confirmed MSI version changes.
 	Retrying automatically in {seconds}s…	{seconds} 秒后自动重试…

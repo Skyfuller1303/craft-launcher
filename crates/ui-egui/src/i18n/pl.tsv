@@ -371,6 +371,9 @@ filter	Installed	Zainstalowane
 	Open installation folder	Otwórz folder instalacji
 	Version changes keep the existing installation folder and package format.	Zmiana wersji zachowuje bieżący folder instalacji i format pakietu.
 	Package format	Format pakietu
+	System default	Domyślny systemowy
+	Choose a folder for a new installation	Wybierz folder dla nowej instalacji
+	Custom folders are available for portable ZIP packages.	Własne foldery są dostępne dla przenośnych pakietów ZIP.
 	Installation in progress. You can close this window.	Trwa instalacja. Możesz zamknąć to okno.
 	Save update preferences	Zapisz preferencje aktualizacji
 @msg	GitHub's request limit was reached. Try again later.	Osiągnięto limit żądań GitHuba. Spróbuj ponownie później.
@@ -379,6 +382,10 @@ filter	Installed	Zainstalowane
 @msg	This release has no published checksum for this download.	To wydanie nie ma opublikowanej sumy kontrolnej dla tego pliku.
 @msg	This package format cannot safely downgrade here. Use a portable installation instead.	Ten format pakietu nie pozwala tutaj bezpiecznie zainstalować starszej wersji. Użyj instalacji przenośnej.
 @msg	The installer finished, but the selected version could not be confirmed. Check the installed version before retrying.	Instalator zakończył pracę, ale nie udało się potwierdzić wybranej wersji. Sprawdź zainstalowaną wersję przed ponowną próbą.
+@msg	Custom folders are supported for portable ZIP installations only.	Własne foldery są obsługiwane tylko dla przenośnych instalacji ZIP.
+@msg	The installation would overwrite an unrecorded file.	Instalacja nadpisałaby plik, którego nie ma w rejestrze instalacji.
+@msg	Choose an absolute installation folder without parent-directory components.	Wybierz bezwzględną ścieżkę folderu instalacji bez odwołań do folderu nadrzędnego.
+@msg	The portable executable does not match the selected version. The installation was rolled back.	Przenośny plik wykonywalny nie odpowiada wybranej wersji. Instalacja została wycofana.
 	Retrying automatically in {seconds}s…	Automatyczna ponowna próba za {seconds}s…
 	Keep this version after switching	Zachowaj tę wersję po zmianie
 	Launcher version	Wersja programu uruchamiającego

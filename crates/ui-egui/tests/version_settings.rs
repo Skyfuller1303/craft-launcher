@@ -48,9 +48,6 @@ impl Backend for Fake {
     fn capabilities(&self) -> Capabilities {
         Capabilities { manage_apps: true, reveal_label: "Show in Explorer", self_update: self.self_update }
     }
-    fn install_kinds(&self) -> Vec<PackageKind> {
-        vec![PackageKind::Msi]
-    }
     fn launcher_installation(&self) -> Option<Installed> {
         self.launcher.clone()
     }
@@ -70,24 +67,26 @@ fn release(v: &str) -> Release {
         version: version::parse(v),
         name: format!("PhotoCraft {v}"),
         html_url: format!("https://github.com/storytold/photocraft/releases/tag/v{v}"),
-        assets: vec![Asset {
-            name: format!("photocraft-{v}-windows-x64.msi"),
-            url: format!("https://github.com/storytold/photocraft/releases/download/v{v}/photocraft-{v}-windows-x64.msi"),
-            size: 100,
-            sha256: Some("b".repeat(64)),
-        }],
+        assets: vec![
+            Asset {
+                name: format!("photocraft-{v}-windows-x64-portable.zip"),
+                url: format!("https://github.com/storytold/photocraft/releases/download/v{v}/photocraft-{v}-windows-x64-portable.zip"),
+                size: 100,
+                sha256: Some("a".repeat(64)),
+            },
+            Asset {
+                name: format!("photocraft-{v}-windows-x64.msi"),
+                url: format!("https://github.com/storytold/photocraft/releases/download/v{v}/photocraft-{v}-windows-x64.msi"),
+                size: 100,
+                sha256: Some("b".repeat(64)),
+            },
+        ],
         ..Release::default()
     }
 }
 
 fn launcher_release(v: &str) -> Release {
     let mut r = release(v);
-    r.assets.push(Asset {
-        name: format!("photocraft-{v}-windows-x64-portable.zip"),
-        url: format!("https://github.com/storytold/photocraft/releases/download/v{v}/photocraft-{v}-windows-x64-portable.zip"),
-        size: 100,
-        sha256: Some("a".repeat(64)),
-    });
     r.name = format!("ArtCraft Launcher {v}");
     r.html_url = format!("https://github.com/storytold/craft-launcher/releases/tag/v{v}");
     for asset in &mut r.assets {
@@ -132,7 +131,7 @@ fn setup_launcher(source: InstallSource, enabled: bool, settings: Settings) -> (
 
 #[test]
 fn launcher_settings_choose_exact_release_without_installing_or_pinning_the_draft() {
-    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let (mut h, sent, inbox) = setup_launcher(InstallSource::Launcher, true, Settings { language: "en".into(), ..Settings::default() });
     h.run_steps(5);
     h.get_by_label("Settings").click();
@@ -154,9 +153,10 @@ fn launcher_settings_choose_exact_release_without_installing_or_pinning_the_draf
     h.run_steps(3);
     assert_eq!(sent.borrow().iter().filter(|c| matches!(c, Command::InstallRelease { app, tag, preferences, .. } if app == artcraft_launcher_core::catalog::LAUNCHER_ID && tag == "v0.1.0" && preferences.pinned_tag.as_deref() == Some("v0.1.0"))).count(), 1);
     assert!(h.state().as_ref().unwrap().settings.pending_launcher_switch.is_none());
-    inbox
-        .borrow_mut()
-        .push(Event::LauncherSwitchScheduled { tag: "v0.1.0".into(), preferences: AppPreferences { pinned_tag: Some("v0.1.0".into()) } });
+    inbox.borrow_mut().push(Event::LauncherSwitchScheduled {
+        tag: "v0.1.0".into(),
+        preferences: AppPreferences { pinned_tag: Some("v0.1.0".into()), ..AppPreferences::default() },
+    });
     h.run_steps(2);
     assert!(h.state().as_ref().unwrap().settings.pending_launcher_switch.is_some());
     assert!(h.state().as_ref().unwrap().settings.apps.is_empty(), "exit helper has not installed yet");
@@ -164,7 +164,7 @@ fn launcher_settings_choose_exact_release_without_installing_or_pinning_the_draf
 
 #[test]
 fn launcher_msi_blocks_downgrades_but_can_select_upgrades_and_disable_pinning() {
-    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let (mut h, sent, _) = setup_launcher(InstallSource::Msi, true, Settings { language: "en".into(), ..Settings::default() });
     h.run_steps(5);
     h.get_by_label("Settings").click();
@@ -193,7 +193,7 @@ fn launcher_msi_blocks_downgrades_but_can_select_upgrades_and_disable_pinning() 
 
 #[test]
 fn launcher_development_instance_lists_releases_but_cannot_replace_itself() {
-    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let (mut h, sent, _) = setup_launcher(InstallSource::Launcher, false, Settings { language: "en".into(), ..Settings::default() });
     h.run_steps(5);
     h.get_by_label("Settings").click();
@@ -212,9 +212,9 @@ fn launcher_development_instance_lists_releases_but_cannot_replace_itself() {
 
 #[test]
 fn launcher_pin_suppresses_auto_update_and_is_applied_only_after_actual_restart() {
-    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let id = artcraft_launcher_core::catalog::LAUNCHER_ID;
-    let pin = AppPreferences { pinned_tag: Some("v0.2.1".into()) };
+    let pin = AppPreferences { pinned_tag: Some("v0.2.1".into()), ..AppPreferences::default() };
     for success in [false, true] {
         let settings = Settings {
             language: "en".into(),
@@ -250,7 +250,7 @@ fn setup_history(settings: Settings, installed: bool, width: f32, fail_history: 
             app: app.id.into(),
             installed: (installed && app.id == "photocraft").then(|| Installed {
                 version: version::parse("0.6.0"),
-                source: InstallSource::Msi,
+                source: InstallSource::Launcher,
                 location: "C:\\My Tools\\photocraft\\photocraft.exe".into(),
                 package: None,
             }),
@@ -291,7 +291,7 @@ fn open(h: &mut Harness<'_, Option<LauncherUi>>, label: &str) {
 
 #[test]
 fn release_history_retry_countdown_and_close_remain_visible_in_english_and_german() {
-    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     for (language, settings_label, countdown, close, filename) in [
         ("en", "App settings…", "Retrying automatically in 120s…", "Close", "releases-retry-en"),
         ("de", "App-Einstellungen…", "Automatischer neuer Versuch in 120s…", "Schließen", "releases-retry-de"),
@@ -310,8 +310,8 @@ fn release_history_retry_countdown_and_close_remain_visible_in_english_and_germa
 }
 
 #[test]
-fn choosing_an_upgrade_waits_for_explicit_action_and_commits_only_after_success() {
-    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+fn choosing_a_downgrade_waits_for_explicit_action_and_commits_only_after_success() {
+    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     for view in [ViewMode::Grid, ViewMode::Table] {
         let (mut h, sent, inbox) = setup(Settings { view, language: "en".into(), notify: false, ..Settings::default() }, true);
         h.run_steps(5);
@@ -329,34 +329,37 @@ fn choosing_an_upgrade_waits_for_explicit_action_and_commits_only_after_success(
         if view == ViewMode::Grid {
             snapshot(&mut h, "version-dropdown-en");
         }
-        h.get_by_label("v0.7.0 · Latest").click();
+        h.get_by_label("v0.5.0").click();
         h.run_steps(3);
         assert!(!sent.borrow().iter().any(|c| matches!(c, Command::InstallRelease { .. })));
         assert!(h.state().as_ref().unwrap().settings.apps.is_empty());
         if view == ViewMode::Grid {
             snapshot(&mut h, "version-settings-en");
         }
-        h.get_by_label("Switch to v0.7.0").click();
+        h.get_by_label("Switch to v0.5.0").click();
         h.run_steps(3);
         assert!(sent.borrow().iter().any(|c| matches!(c, Command::InstallRelease { app, tag, preferences, .. }
-            if app == "photocraft" && tag == "v0.7.0" && preferences.pinned_tag.as_deref() == Some("v0.7.0"))));
+            if app == "photocraft" && tag == "v0.5.0" && preferences.pinned_tag.as_deref() == Some("v0.5.0"))));
         inbox.borrow_mut().push(Event::JobFinished { app: "photocraft".into(), result: Err("disk full".into()) });
         h.run_steps(2);
         assert!(h.state().as_ref().unwrap().settings.apps.is_empty());
         inbox.borrow_mut().extend([
-            Event::VersionInstalled { app: "photocraft".into(), preferences: AppPreferences { pinned_tag: Some("v0.7.0".into()) } },
+            Event::VersionInstalled {
+                app: "photocraft".into(),
+                preferences: AppPreferences { pinned_tag: Some("v0.5.0".into()), ..AppPreferences::default() },
+            },
             Event::Detected {
                 app: "photocraft".into(),
                 installed: Some(Installed {
-                    version: version::parse("0.7.0"),
-                    source: InstallSource::Msi,
+                    version: version::parse("0.5.0"),
+                    source: InstallSource::Launcher,
                     location: "C:\\My Tools\\photocraft\\photocraft.exe".into(),
                     package: None,
                 }),
             },
         ]);
         h.run_steps(3);
-        assert_eq!(h.state().as_ref().unwrap().settings.apps["photocraft"].pinned_tag.as_deref(), Some("v0.7.0"));
+        assert_eq!(h.state().as_ref().unwrap().settings.apps["photocraft"].pinned_tag.as_deref(), Some("v0.5.0"));
         h.get_by_label("Installation").click();
         h.run_steps(3);
         if view == ViewMode::Grid {
@@ -370,9 +373,9 @@ fn choosing_an_upgrade_waits_for_explicit_action_and_commits_only_after_success(
 
 #[test]
 fn pin_survives_restart_and_blocks_update_all_and_automatic_updates() {
-    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let mut settings = Settings { language: "en".into(), auto_update: true, notify: false, ..Settings::default() };
-    settings.apps.insert("photocraft".into(), AppPreferences { pinned_tag: Some("v0.6.0".into()) });
+    settings.apps.insert("photocraft".into(), AppPreferences { pinned_tag: Some("v0.6.0".into()), ..AppPreferences::default() });
     let settings: Settings = serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
     let (mut h, sent, inbox) = setup(settings, true);
     h.run_steps(5);
@@ -396,7 +399,7 @@ fn pin_survives_restart_and_blocks_update_all_and_automatic_updates() {
 
 #[test]
 fn german_version_settings_fit_and_closing_discards_the_draft() {
-    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let (mut h, sent, _) = setup(Settings { language: "de".into(), notify: false, ..Settings::default() }, true);
     h.run_steps(5);
     open(&mut h, "App-Einstellungen…");
@@ -412,12 +415,38 @@ fn german_version_settings_fit_and_closing_discards_the_draft() {
 }
 
 #[test]
+fn a_new_portable_install_uses_its_text_folder_draft() {
+    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let (mut h, sent, _) = setup(Settings { language: "en".into(), notify: false, ..Settings::default() }, false);
+    h.run_steps(5);
+    open(&mut h, "App settings…");
+    h.get_by_label("Installation").click();
+    h.run_steps(3);
+    h.get_by_value("System default").click();
+    h.run_steps(3);
+    h.get_by_label("Portable (.zip)").click();
+    h.run_steps(3);
+    h.get_by_label("Choose a folder for a new installation").click();
+    h.run_steps(2);
+    h.get_all_by_role(egui::accesskit::Role::TextInput).last().unwrap().focus();
+    h.get_all_by_role(egui::accesskit::Role::TextInput).last().unwrap().type_text("D:\\My Tools");
+    h.run_steps(3);
+    snapshot(&mut h, "installation-new-portable-en");
+    h.get_by_label("Version").click();
+    h.run_steps(3);
+    h.get_by_label("Switch to v0.7.0").click();
+    h.run_steps(2);
+    assert!(sent.borrow().iter().any(|c| matches!(c, Command::InstallRelease { preferences, .. }
+        if preferences.package == Some(PackageKind::PortableZip) && preferences.install_dir.as_deref() == Some("D:\\My Tools"))));
+}
+
+#[test]
 fn table_keeps_the_vertical_menu_beside_open_in_narrow_windows() {
-    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     for width in [720.0, 960.0, 1120.0, 1180.0] {
         for language in ["en", "de"] {
             let mut settings = Settings { view: ViewMode::Table, language: language.into(), notify: false, ..Settings::default() };
-            settings.apps.insert("photocraft".into(), AppPreferences { pinned_tag: Some("v0.6.0".into()) });
+            settings.apps.insert("photocraft".into(), AppPreferences { pinned_tag: Some("v0.6.0".into()), ..AppPreferences::default() });
             let (mut h, _, _) = setup_at_width(settings, true, width);
             h.run_steps(5);
             let open_label = if language == "de" { "Öffnen" } else { "Open" };
@@ -439,7 +468,7 @@ fn table_keeps_the_vertical_menu_beside_open_in_narrow_windows() {
 
 #[test]
 fn an_msi_downgrade_is_blocked_without_installing_or_changing_preferences() {
-    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     for language in ["en", "de"] {
         let (mut h, sent, inbox) = setup(Settings { language: language.into(), notify: false, ..Settings::default() }, true);
         inbox.borrow_mut().push(Event::Detected {
@@ -472,9 +501,9 @@ fn an_msi_downgrade_is_blocked_without_installing_or_changing_preferences() {
 }
 
 #[test]
-fn switching_an_upgrade_can_pin_or_follow_updates() {
-    let _language = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-    for tag in ["v0.7.0"] {
+fn switching_can_pin_or_follow_updates_for_both_upgrade_and_downgrade() {
+    let _language_guard = UI_LANGUAGE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    for tag in ["v0.7.0", "v0.5.0"] {
         for pin in [true, false] {
             let (mut h, sent, inbox) = setup(Settings { language: "en".into(), notify: false, ..Settings::default() }, true);
             h.run_steps(5);

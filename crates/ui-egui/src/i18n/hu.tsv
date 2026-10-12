@@ -370,6 +370,9 @@ filter	Installed	Telepítve
 	Open installation folder	Telepítési mappa megnyitása
 	Version changes keep the existing installation folder and package format.	Verzióváltáskor megmarad a jelenlegi telepítési mappa és csomagformátum.
 	Package format	Csomagformátum
+	System default	Rendszer alapértelmezése
+	Choose a folder for a new installation	Mappa kiválasztása új telepítéshez
+	Custom folders are available for portable ZIP packages.	Egyéni mappa hordozható ZIP-csomagokhoz használható.
 	Installation in progress. You can close this window.	Telepítés folyamatban. Bezárhatod ezt az ablakot.
 	Save update preferences	Frissítési beállítások mentése
 @msg	GitHub's request limit was reached. Try again later.	Elérted a GitHub kérési korlátját. Próbáld újra később.
@@ -378,6 +381,10 @@ filter	Installed	Telepítve
 @msg	This release has no published checksum for this download.	Ehhez a letöltéshez nincs közzétett ellenőrzőösszeg ebben a kiadásban.
 @msg	This package format cannot safely downgrade here. Use a portable installation instead.	Ezzel a csomagformátummal itt nem lehet biztonságosan régebbi verzióra váltani. Használj hordozható telepítést.
 @msg	The installer finished, but the selected version could not be confirmed. Check the installed version before retrying.	A telepítő befejeződött, de a kiválasztott verziót nem sikerült megerősíteni. Újrapróbálkozás előtt ellenőrizd a telepített verziót.
+@msg	Custom folders are supported for portable ZIP installations only.	Egyéni mappa csak hordozható ZIP-telepítéshez használható.
+@msg	The installation would overwrite an unrecorded file.	A telepítés felülírna egy nem nyilvántartott fájlt.
+@msg	Choose an absolute installation folder without parent-directory components.	Válassz abszolút telepítési mappaútvonalat, szülőmappára utaló elemek nélkül.
+@msg	The portable executable does not match the selected version. The installation was rolled back.	A hordozható futtatható fájl nem egyezik a kiválasztott verzióval. A telepítést visszavontuk.
 	Retrying automatically in {seconds}s…	Automatikus újrapróbálkozás {seconds} másodperc múlva…
 	Keep this version after switching	Verzió megtartása váltás után
 	Launcher version	Indító verziója

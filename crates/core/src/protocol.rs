@@ -81,6 +81,9 @@ pub struct BackendOptions {
 #[serde(default)]
 pub struct AppPreferences {
     pub pinned_tag: Option<String>,
+    /// Parent folder for a new portable installation. Existing installs retain their location.
+    pub install_dir: Option<String>,
+    pub package: Option<PackageKind>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]

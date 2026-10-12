@@ -641,7 +641,14 @@ fn run_install(
     if requested.is_none() && preferences.is_some_and(|p| p.pinned_tag.as_ref().is_some_and(|tag| *tag != release.tag)) {
         return Err("This app is pinned to a selected version. Open its settings to change versions.".into());
     }
-    let (asset, kind) = planned_asset(app, &release, platform, options, existing, record)
+    let mut selected_options = options.clone();
+    if let Some(preferences) = preferences {
+        selected_options.apps.insert(app.id.to_string(), preferences.clone());
+    }
+    if let Some(package) = preferences.and_then(|p| p.package) {
+        selected_options.kinds = vec![package];
+    }
+    let (asset, kind) = planned_asset(app, &release, platform, &selected_options, existing, record)
         .ok_or_else(|| format!("{} {} has no download for {}", app.name, release.version_label(), platform.label()))?;
     if downgrade_blocked(kind, &release, existing) {
         return Err("This package format cannot safely downgrade here. Use a portable installation instead.".into());
@@ -656,8 +663,21 @@ fn run_install(
         shared.emit(Event::Progress { app: app.id.to_string(), phase: p });
     };
     let mut job = Job { http, paths, stop, phase: &mut phase };
-    let new_record = install::install(app, &release, &asset, kind, existing, record, &mut job)?;
-    {
+    let directory = preferences.and_then(|p| p.install_dir.as_deref()).map(std::path::Path::new);
+    let mut record_saved = false;
+    let new_record = {
+        let mut commit = |record: &crate::manifest::Record| {
+            let mut manifest = shared.manifest.lock().unwrap_or_else(PoisonError::into_inner);
+            let mut updated = manifest.clone();
+            updated.apps.insert(app.id.to_string(), record.clone());
+            updated.save(&paths.manifest())?;
+            *manifest = updated;
+            record_saved = true;
+            Ok(())
+        };
+        install::install_at(app, &release, &asset, kind, existing, record, &mut job, directory, Some(&mut commit))?
+    };
+    if !record_saved {
         let mut m = shared.manifest.lock().unwrap_or_else(PoisonError::into_inner);
         let mut updated = m.clone();
         let changed = match new_record {
@@ -765,7 +785,10 @@ fn planned_asset(
     record: Option<&crate::manifest::Record>,
 ) -> Option<(Asset, PackageKind)> {
     let stems: Vec<&str> = app.stems().collect();
-    let kinds = install::choose_kinds(existing, record, &options.kinds);
+    let kinds = match (existing, options.apps.get(app.id).and_then(|p| p.package)) {
+        (None, Some(package)) => vec![package],
+        _ => install::choose_kinds(existing, record, &options.kinds),
+    };
     pick_asset(release, &stems, platform, &kinds).map(|(a, k)| (a.clone(), k))
 }
 
@@ -792,6 +815,9 @@ fn planned_download(
     let mut options = options.clone();
     if let Some((_, preferences)) = &requested {
         options.apps.insert(app.id.to_string(), preferences.clone());
+    }
+    if let Some(package) = requested.as_ref().and_then(|(_, p)| p.package).or_else(|| options.apps.get(app.id).and_then(|p| p.package)) {
+        options.kinds = vec![package];
     }
     let existing = shared.installed.lock().unwrap_or_else(PoisonError::into_inner).get(app.id).cloned();
     let record = shared.manifest.lock().unwrap_or_else(PoisonError::into_inner).apps.get(app.id).cloned();
@@ -1114,6 +1140,13 @@ impl Backend for NativeBackend {
                         return;
                     }
                     if app == LAUNCHER_ID {
+                        if preferences.install_dir.is_some() || preferences.package.is_some() {
+                            self.shared.emit(Event::JobFinished {
+                                app,
+                                result: Err("Version changes keep the existing installation folder and package format.".into()),
+                            });
+                            return;
+                        }
                         self.update_launcher(Some((release, preferences)));
                     } else {
                         self.start_job(&app, false, Some((release, preferences)));
@@ -1565,7 +1598,7 @@ mod tests {
         let Some(platform) = native_platform() else { return };
         let dir = tempfile::tempdir().unwrap();
         let backend = backend(dir.path(), platform, None);
-        let prefs = artcraft_launcher_core::protocol::AppPreferences { pinned_tag: Some("v0.4.0".into()) };
+        let prefs = artcraft_launcher_core::protocol::AppPreferences { pinned_tag: Some("v0.4.0".into()), ..Default::default() };
         let selected = Release { tag: "v0.4.0".into(), version: version::parse("0.4.0"), ..release("0.4.0") };
         backend.shared.requested.lock().unwrap().insert(APP.into(), (selected, prefs));
         let saved = keep_file(&backend);
@@ -1603,6 +1636,23 @@ mod tests {
         }
         save_requests(&paths_for_requests(&backend.paths), &backend.shared.requested.lock().unwrap()).unwrap();
         assert_eq!(load_requests(&backend.paths).len(), 1);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn an_explicit_portable_choice_never_falls_back_to_msi() {
+        let app = CraftApp::by_id(APP).unwrap();
+        let platform = Platform { os: Os::Windows, arch: Arch::X64 };
+        let options = BackendOptions {
+            apps: [(APP.into(), artcraft_launcher_core::protocol::AppPreferences { package: Some(PackageKind::PortableZip), ..Default::default() })]
+                .into(),
+            ..Default::default()
+        };
+        let mut only_msi = release("0.5.0");
+        only_msi.assets.retain(|a| a.name.ends_with(".msi"));
+        assert!(planned_asset(app, &only_msi, platform, &options, None, None).is_none());
+        let existing = Installed { source: InstallSource::Msi, ..copy("0.4.0") };
+        assert_eq!(planned_asset(app, &only_msi, platform, &options, Some(&existing), None).unwrap().1, PackageKind::Msi);
     }
 
     /// A PhotoCraft release with one file per platform and format, so whichever this machine
@@ -1648,7 +1698,12 @@ mod tests {
         assert!(b.shared.jobs.lock().unwrap().is_empty());
         b.send(Command::InstallRelease { app: LAUNCHER_ID.into(), tag: "v99.0.0".into(), preferences: AppPreferences::default() });
         assert!(matches!(b.poll().as_slice(), [Event::JobFinished { result: Err(e), .. }] if e.contains("Reload the release list")));
-        b.shared.options.lock().unwrap().apps.insert(LAUNCHER_ID.into(), AppPreferences { pinned_tag: Some("v0.2.1".into()) });
+        b.shared
+            .options
+            .lock()
+            .unwrap()
+            .apps
+            .insert(LAUNCHER_ID.into(), AppPreferences { pinned_tag: Some("v0.2.1".into()), ..AppPreferences::default() });
         b.send(Command::UpdateLauncher);
         assert!(matches!(b.poll().as_slice(), [Event::JobFinished { result: Err(e), .. }] if e.contains("pinned")));
         assert!(b.shared.jobs.lock().unwrap().is_empty());

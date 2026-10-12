@@ -373,6 +373,9 @@ filter	Installed	インストール済み
 	Open installation folder	インストール先フォルダーを開く
 	Version changes keep the existing installation folder and package format.	バージョンを変更しても、インストール先フォルダーとパッケージ形式は維持されます。
 	Package format	パッケージ形式
+	System default	システムの既定
+	Choose a folder for a new installation	新規インストール先のフォルダーを選択
+	Custom folders are available for portable ZIP packages.	ポータブル ZIP パッケージではカスタムフォルダーを使用できます。
 	Installation in progress. You can close this window.	インストール中です。このウィンドウは閉じてもかまいません。
 	Save update preferences	更新設定を保存
 @msg	GitHub's request limit was reached. Try again later.	GitHub のリクエスト上限に達しました。しばらくしてから再試行してください。
@@ -381,6 +384,10 @@ filter	Installed	インストール済み
 @msg	This release has no published checksum for this download.	このダウンロードには公開されたチェックサムがありません。
 @msg	This package format cannot safely downgrade here. Use a portable installation instead.	このパッケージ形式はこの環境では安全にダウングレードできません。ポータブル版を使用してください。
 @msg	The installer finished, but the selected version could not be confirmed. Check the installed version before retrying.	インストールは完了しましたが、選択したバージョンを確認できませんでした。再試行する前にインストール済みのバージョンを確認してください。
+@msg	Custom folders are supported for portable ZIP installations only.	カスタムフォルダーはポータブル ZIP のインストールでのみ使用できます。
+@msg	The installation would overwrite an unrecorded file.	インストールすると、記録されていないファイルが上書きされます。
+@msg	Choose an absolute installation folder without parent-directory components.	親ディレクトリを示す要素を含まない、絶対パスのインストール先フォルダーを選択してください。
+@msg	The portable executable does not match the selected version. The installation was rolled back.	ポータブル版の実行ファイルが選択したバージョンと一致しません。インストールを元に戻しました。
 	Retrying automatically in {seconds}s…	{seconds} 秒後に自動で再試行…
 	Keep this version after switching	切り替え後、このバージョンを固定
 	Launcher version	ランチャーのバージョン

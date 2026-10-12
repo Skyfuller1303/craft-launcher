@@ -1,4 +1,4 @@
-# Version history and pinning
+# Per-app versions and installation settings
 
 Open an app's **⋮ → App settings…** menu in either grid or table view.
 
@@ -28,10 +28,23 @@ Paused or failed version downloads retain their exact release across restarts. R
 does not silently select the latest release. If a kept version's metadata is no longer loaded,
 open its settings before reinstalling it.
 
-The **Installation** tab shows the current location, opens it in the file manager and offers
-the existing uninstall confirmation. Package formats and install locations follow the existing
-platform rules. Native Windows tool installs use MSI; MSI, RPM and Flatpak downgrades remain
-blocked. Portable ZIP installation and quiet MSI recovery are separate changes.
+The **Installation** tab shows the actual folder, opens it in the file manager, and offers the
+existing uninstall confirmation. New Windows portable ZIP installations can use a chosen
+parent folder. Windows ZIPs install under `<parent>/<app-id>`. Existing portable ZIP installations retain
+their location and package format. AppImage updates continue to use the standard ~/Applications
+folder; user-managed AppImages elsewhere are left alone.
+
+## Package limits
+
+| Format | Version changes | Custom folder |
+| --- | --- | --- |
+| Windows portable ZIP | Upgrade and downgrade; executable VERSIONINFO must match the selected release | New installations only |
+| Windows MSI | Upgrade only; downgrade blocked | Installer-managed |
+| macOS DMG | Existing bundle replacement and version checks | Existing application location |
+| Linux AppImage | Replace verified download in ~/Applications | Standard folder |
+| Linux DEB | Existing apt installation, including its downgrade support | System-managed |
+| Linux RPM / Flatpak | Upgrade; downgrade blocked | System-managed |
+| FreeBSD tarball | Existing installer path | Existing prefix |
 
 ## Launcher self-update
 
@@ -57,7 +70,14 @@ The global **Automatic updates** setting also updates the launcher unless its ve
 Every installation requires a published checksum. Windows MSI self-update retains the existing
 /passive progress window; quiet installation and MSI downgrade recovery are separate changes.
 
-Tests cover version selection, pinning, resumed URL validation without
+Windows portable replacement backs up recorded program files and rolls back on copy,
+version-verification or manifest-save errors. Unrecorded settings and documents are preserved,
+including during uninstall. The launcher permits host directory links but rejects links/junctions inside its owned folder, unsafe ZIP paths,
+duplicate names and collisions with unrecorded files. Failed rollback retains recovery files
+and reports their location. External installers and power loss have platform-specific limits;
+this feature does not promise transactional rollback for them.
+
+Tests cover version selection, pinning, resumed URL validation and portable rollback without
 changing installed software. A real MSI uninstall/install cycle requires a disposable Windows
 environment. macOS and FreeBSD installers still require native validation. The browser keeps
 its download-only interface; native settings and install actions remain desktop-only.

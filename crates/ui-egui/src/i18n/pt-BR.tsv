@@ -358,6 +358,9 @@ filter	Installed	Instalados
 	Open installation folder	Abrir pasta de instalação
 	Version changes keep the existing installation folder and package format.	A mudança de versão mantém a pasta de instalação e o formato do pacote.
 	Package format	Formato do pacote
+	System default	Padrão do sistema
+	Choose a folder for a new installation	Escolher uma pasta para uma nova instalação
+	Custom folders are available for portable ZIP packages.	Pastas personalizadas estão disponíveis para pacotes ZIP portáteis.
 	Installation in progress. You can close this window.	Instalação em andamento. Você pode fechar esta janela.
 	Save update preferences	Salvar preferências de atualização
 
@@ -368,8 +371,12 @@ filter	Installed	Instalados
 @msg	This release has no published checksum for this download.	Nenhuma soma de verificação foi publicada para este download.
 @msg	This package format cannot safely downgrade here. Use a portable installation instead.	Este formato não permite voltar a uma versão anterior com segurança aqui. Use uma instalação portátil.
 @msg	The installer finished, but the selected version could not be confirmed. Check the installed version before retrying.	A instalação terminou, mas a versão selecionada não pôde ser confirmada. Verifique a versão instalada antes de tentar novamente.
+@msg	Custom folders are supported for portable ZIP installations only.	Pastas personalizadas são compatíveis apenas com instalações ZIP portáteis.
+@msg	The installation would overwrite an unrecorded file.	A instalação substituiria um arquivo não registrado.
+@msg	Choose an absolute installation folder without parent-directory components.	Escolha um caminho de instalação absoluto sem referências à pasta pai.
 
 # Version management messages.
+@msg	The portable executable does not match the selected version. The installation was rolled back.	O executável portátil não corresponde à versão selecionada. A instalação foi revertida.
 
 # Confirmed MSI version changes.
 	Retrying automatically in {seconds}s…	Nova tentativa automática em {seconds}s…

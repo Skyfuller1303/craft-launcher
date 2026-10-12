@@ -368,6 +368,9 @@ filter	Installed	Installées
 	Open installation folder	Ouvrir le dossier d’installation
 	Version changes keep the existing installation folder and package format.	Changer de version conserve le dossier d’installation et le format du paquet.
 	Package format	Format du paquet
+	System default	Valeur par défaut du système
+	Choose a folder for a new installation	Choisir un dossier pour une nouvelle installation
+	Custom folders are available for portable ZIP packages.	Les dossiers personnalisés sont disponibles pour les paquets ZIP portables.
 	Installation in progress. You can close this window.	Installation en cours. Vous pouvez fermer cette fenêtre.
 	Save update preferences	Enregistrer les préférences de mise à jour
 
@@ -378,8 +381,12 @@ filter	Installed	Installées
 @msg	This release has no published checksum for this download.	Aucune somme de contrôle n’est publiée pour ce téléchargement.
 @msg	This package format cannot safely downgrade here. Use a portable installation instead.	Ce format ne permet pas de rétrograder en sécurité ici. Utilisez une installation portable.
 @msg	The installer finished, but the selected version could not be confirmed. Check the installed version before retrying.	L’installation est terminée, mais la version choisie n’a pas pu être confirmée. Vérifiez la version installée avant de réessayer.
+@msg	Custom folders are supported for portable ZIP installations only.	Les dossiers personnalisés sont pris en charge uniquement pour les installations ZIP portables.
+@msg	The installation would overwrite an unrecorded file.	L’installation écraserait un fichier qui ne lui appartient pas.
+@msg	Choose an absolute installation folder without parent-directory components.	Choisissez un chemin d’installation absolu sans remontée vers un dossier parent.
 
 # Version management messages.
+@msg	The portable executable does not match the selected version. The installation was rolled back.	L’exécutable portable ne correspond pas à la version choisie. L’installation a été annulée et les fichiers restaurés.
 
 # Confirmed MSI version changes.
 	Retrying automatically in {seconds}s…	Nouvelle tentative automatique dans {seconds}s…

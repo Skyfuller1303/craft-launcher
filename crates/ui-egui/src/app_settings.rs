@@ -16,12 +16,19 @@ pub(crate) struct Draft {
     tag: String,
     pin: bool,
     prereleases: bool,
+    package: Option<PackageKind>,
+    pub directory: String,
+    custom: bool,
     installation_tab: bool,
 }
 
 impl Draft {
     fn preferences(&self) -> AppPreferences {
-        AppPreferences { pinned_tag: self.pin.then(|| self.tag.clone()) }
+        AppPreferences {
+            pinned_tag: self.pin.then(|| self.tag.clone()),
+            install_dir: (self.custom && !self.directory.trim().is_empty()).then(|| self.directory.trim().to_string()),
+            package: self.package,
+        }
     }
 }
 
@@ -80,7 +87,16 @@ impl LauncherUi {
             .unwrap_or_default();
         let load = entry.history_page == 0 || entry.history_error.is_some();
         let pin = preferences.pinned_tag.is_some() || !self.settings.apps.contains_key(id);
-        self.app_settings = Some(Draft { app: id.to_string(), tag, pin, prereleases: self.settings.prereleases, installation_tab: false });
+        self.app_settings = Some(Draft {
+            app: id.to_string(),
+            tag,
+            pin,
+            prereleases: self.settings.prereleases,
+            package: preferences.package,
+            custom: preferences.install_dir.is_some(),
+            directory: preferences.install_dir.unwrap_or_default(),
+            installation_tab: false,
+        });
         self.dialog = Some(Dialog::AppSettings(id.to_string()));
         if load {
             self.load_app_releases(id, 1, false);
@@ -117,11 +133,11 @@ impl LauncherUi {
             InstallSource::Rpm => Some(PackageKind::Rpm),
             InstallSource::Flatpak => Some(PackageKind::Flatpak),
             InstallSource::AppImage => Some(PackageKind::AppImage),
-            InstallSource::Launcher if launcher && os == Some(Os::Windows) => Some(PackageKind::PortableZip),
+            InstallSource::Launcher if os == Some(Os::Windows) => Some(PackageKind::PortableZip),
             InstallSource::Launcher if installed.location.to_lowercase().ends_with(".appimage") => Some(PackageKind::AppImage),
             _ => None,
         });
-        let kinds: Vec<_> = existing_kind.map(|kind| vec![kind]).unwrap_or_else(|| self.install_kinds.clone());
+        let kinds: Vec<_> = existing_kind.or(draft.package).map(|kind| vec![kind]).unwrap_or_else(|| self.install_kinds.clone());
         let stems: Vec<_> = entry.app.stems().collect();
         let mut releases = entry.releases.clone();
         if let Some(latest) = entry.release()
@@ -208,6 +224,7 @@ impl LauncherUi {
                         && !blocked
                         && !same_version
                         && release.version.is_some()
+                        && (!draft.custom || !draft.directory.trim().is_empty())
                         && (draft.prereleases || !release.prerelease && release.version.as_ref().is_none_or(|v| v.pre.is_empty()));
                     if blocked {
                         ui.label(tl!("This package cannot downgrade here. Use a portable installation instead."));
@@ -264,6 +281,35 @@ impl LauncherUi {
                     }
                 } else {
                     ui.label(tl!("Not installed"));
+                }
+                ui.add_space(12.0);
+                ui.add_enabled_ui(!busy && entry.installed.is_none(), |ui| {
+                    ui.label(tl!("Package format"));
+                    egui::ComboBox::from_id_salt(("app-package", id))
+                        .selected_text(draft.package.map_or(tl!("System default"), |k| crate::i18n::t(k.label())))
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut draft.package, None, tl!("System default"));
+                            let portable = match os {
+                                Some(Os::Windows) => Some(PackageKind::PortableZip),
+                                _ => None,
+                            };
+                            if let Some(kind) = portable {
+                                ui.selectable_value(&mut draft.package, Some(kind), crate::i18n::t(kind.label()));
+                            }
+                        });
+                });
+                let custom_supported = existing_kind.or(draft.package) == Some(PackageKind::PortableZip);
+                if !custom_supported && entry.installed.is_none() {
+                    draft.custom = false;
+                }
+                ui.add_enabled_ui(custom_supported && !busy && entry.installed.is_none(), |ui| {
+                    ui.checkbox(&mut draft.custom, tl!("Choose a folder for a new installation"));
+                    if draft.custom {
+                        ui.text_edit_singleline(&mut draft.directory);
+                    }
+                });
+                if !custom_supported {
+                    ui.label(tl!("Custom folders are available for portable ZIP packages."));
                 }
                 ui.add_space(10.0);
                 if entry.installed.is_some() && ui.add_enabled(!busy, egui::Button::new(tl!("Uninstall…"))).clicked() {

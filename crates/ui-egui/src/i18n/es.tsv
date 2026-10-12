@@ -351,6 +351,9 @@ filter	Installed	Instaladas
 	Open installation folder	Abrir la carpeta de instalación
 	Version changes keep the existing installation folder and package format.	Los cambios de versión conservan la carpeta de instalación y el formato del paquete.
 	Package format	Formato del paquete
+	System default	Predeterminado del sistema
+	Choose a folder for a new installation	Elegir una carpeta para una instalación nueva
+	Custom folders are available for portable ZIP packages.	Los paquetes ZIP portátiles permiten elegir una carpeta personalizada.
 	Installation in progress. You can close this window.	Instalación en curso. Puedes cerrar esta ventana.
 	Save update preferences	Guardar preferencias de actualización
 @msg	GitHub's request limit was reached. Try again later.	Se ha alcanzado el límite de solicitudes de GitHub. Inténtalo más tarde.
@@ -359,6 +362,10 @@ filter	Installed	Instaladas
 @msg	This release has no published checksum for this download.	Esta versión no tiene una suma de comprobación publicada para esta descarga.
 @msg	This package format cannot safely downgrade here. Use a portable installation instead.	Este formato de paquete no permite instalar una versión anterior de forma segura aquí. Usa una instalación portátil.
 @msg	The installer finished, but the selected version could not be confirmed. Check the installed version before retrying.	El instalador ha terminado, pero no se ha podido confirmar la versión seleccionada. Comprueba la versión instalada antes de volver a intentarlo.
+@msg	Custom folders are supported for portable ZIP installations only.	Las carpetas personalizadas solo se admiten en instalaciones ZIP portátiles.
+@msg	The installation would overwrite an unrecorded file.	La instalación sobrescribiría un archivo no registrado.
+@msg	Choose an absolute installation folder without parent-directory components.	Elige una carpeta de instalación con una ruta absoluta que no contenga referencias a carpetas superiores.
+@msg	The portable executable does not match the selected version. The installation was rolled back.	El ejecutable portátil no coincide con la versión seleccionada. Se ha revertido la instalación.
 	Retrying automatically in {seconds}s…	Reintentando automáticamente en {seconds} s…
 	Keep this version after switching	Fijar esta versión después del cambio
 	Launcher version	Versión del lanzador

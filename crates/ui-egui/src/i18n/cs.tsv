@@ -338,6 +338,9 @@ filter	Installed	Nainstalováno
 	Open installation folder	Otevřít instalační složku
 	Version changes keep the existing installation folder and package format.	Změny verze zachovají stávající instalační složku a formát balíčku.
 	Package format	Formát balíčku
+	System default	Výchozí nastavení systému
+	Choose a folder for a new installation	Vybrat složku pro novou instalaci
+	Custom folders are available for portable ZIP packages.	Pro přenosné balíčky ZIP lze zvolit vlastní složku.
 	Installation in progress. You can close this window.	Probíhá instalace. Toto okno můžete zavřít.
 	Save update preferences	Uložit předvolby aktualizací
 @msg	GitHub's request limit was reached. Try again later.	Byl dosažen limit požadavků GitHubu. Zkuste to později.
@@ -346,6 +349,10 @@ filter	Installed	Nainstalováno
 @msg	This release has no published checksum for this download.	Toto vydání nemá pro toto stažení zveřejněný kontrolní součet.
 @msg	This package format cannot safely downgrade here. Use a portable installation instead.	Tento formát balíčku zde nelze bezpečně vrátit na starší verzi. Použijte přenosnou instalaci.
 @msg	The installer finished, but the selected version could not be confirmed. Check the installed version before retrying.	Instalátor dokončil práci, ale vybranou verzi se nepodařilo potvrdit. Před dalším pokusem zkontrolujte nainstalovanou verzi.
+@msg	Custom folders are supported for portable ZIP installations only.	Vlastní složky jsou podporovány pouze u přenosných instalací ZIP.
+@msg	The installation would overwrite an unrecorded file.	Instalace by přepsala nezaznamenaný soubor.
+@msg	Choose an absolute installation folder without parent-directory components.	Vyberte instalační složku s absolutní cestou bez odkazů na nadřazené složky.
+@msg	The portable executable does not match the selected version. The installation was rolled back.	Přenosný spustitelný soubor neodpovídá vybrané verzi. Instalace byla vrácena zpět.
 	Retrying automatically in {seconds}s…	Automatický další pokus za {seconds} s…
 	Keep this version after switching	Po změně připnout tuto verzi
 	Launcher version	Verze spouštěče

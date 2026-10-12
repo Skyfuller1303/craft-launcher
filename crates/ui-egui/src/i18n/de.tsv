@@ -370,6 +370,9 @@ filter	Installed	Installiert
 	Open installation folder	Installationsordner öffnen
 	Version changes keep the existing installation folder and package format.	Versionswechsel behalten Installationsort und Paketformat bei.
 	Package format	Paketformat
+	System default	Systemstandard
+	Choose a folder for a new installation	Ordner für neue Installation auswählen
+	Custom folders are available for portable ZIP packages.	Eigene Ordner sind für portable ZIP-Pakete verfügbar.
 	Installation in progress. You can close this window.	Installation läuft. Du kannst dieses Fenster schließen.
 	Save update preferences	Update-Einstellungen speichern
 
@@ -380,8 +383,12 @@ filter	Installed	Installiert
 @msg	This release has no published checksum for this download.	Für diesen Download ist keine Prüfsumme veröffentlicht.
 @msg	This package format cannot safely downgrade here. Use a portable installation instead.	Dieses Paketformat unterstützt hier kein sicheres Downgrade. Verwende eine portable Installation.
 @msg	The installer finished, but the selected version could not be confirmed. Check the installed version before retrying.	Installation beendet, gewählte Version aber nicht bestätigt. Prüfe vor einem neuen Versuch die installierte Version.
+@msg	Custom folders are supported for portable ZIP installations only.	Eigene Ordner werden nur für portable ZIP-Installationen unterstützt.
+@msg	The installation would overwrite an unrecorded file.	Installation würde eine persönliche oder fremde Datei überschreiben.
+@msg	Choose an absolute installation folder without parent-directory components.	Wähle einen absoluten Installationspfad ohne übergeordnete Pfadbestandteile.
 
 # Version management messages.
+@msg	The portable executable does not match the selected version. The installation was rolled back.	Die portable EXE entspricht nicht der gewählten Version. Installation wurde zurückgerollt.
 
 # Confirmed MSI version changes.
 	Retrying automatically in {seconds}s…	Automatischer neuer Versuch in {seconds}s…

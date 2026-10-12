@@ -366,6 +366,9 @@ filter	Installed	Установлены
 	Open installation folder	Открыть папку установки
 	Version changes keep the existing installation folder and package format.	При смене версии сохраняются папка установки и формат пакета.
 	Package format	Формат пакета
+	System default	По умолчанию в системе
+	Choose a folder for a new installation	Выбрать папку для новой установки
+	Custom folders are available for portable ZIP packages.	Пользовательские папки доступны для переносимых ZIP-пакетов.
 	Installation in progress. You can close this window.	Идёт установка. Это окно можно закрыть.
 	Save update preferences	Сохранить настройки обновлений
 
@@ -376,8 +379,12 @@ filter	Installed	Установлены
 @msg	This release has no published checksum for this download.	Для этой загрузки не опубликована контрольная сумма.
 @msg	This package format cannot safely downgrade here. Use a portable installation instead.	Этот формат пакета не поддерживает безопасный откат здесь. Используйте портативную установку.
 @msg	The installer finished, but the selected version could not be confirmed. Check the installed version before retrying.	Установка завершена, но выбранная версия не подтверждена. Проверьте установленную версию перед повтором.
+@msg	Custom folders are supported for portable ZIP installations only.	Пользовательские папки поддерживаются только для переносимых ZIP-установок.
+@msg	The installation would overwrite an unrecorded file.	Установка перезапишет файл, не принадлежащий приложению.
+@msg	Choose an absolute installation folder without parent-directory components.	Выберите абсолютный путь без переходов в родительскую папку.
 
 # Version management messages.
+@msg	The portable executable does not match the selected version. The installation was rolled back.	Версия портативного файла не совпадает с выбранной. Установка отменена с восстановлением файлов.
 
 # Confirmed MSI version changes.
 	Retrying automatically in {seconds}s…	Автоматическая повторная попытка через {seconds} с…
