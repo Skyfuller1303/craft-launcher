@@ -325,3 +325,17 @@ filter	Installed	Instaladas
 	ArtCraft on GitHub	ArtCraft en GitHub
 	Join the ArtCraft Discord	Únete al Discord de ArtCraft
 @plural	ArtCraft Launcher · {n} update available|ArtCraft Launcher · {n} updates available	ArtCraft Launcher · {n} actualización disponible|ArtCraft Launcher · {n} actualizaciones disponibles
+	Install folder	Carpeta de instalación
+	Default install folder	Carpeta de instalación predeterminada
+	System default	Predeterminada del sistema
+	Browse…	Examinar…
+	Use default	Usar predeterminada
+	New installs use this folder. Updates stay in their current location.	Las nuevas instalaciones usan esta carpeta. Las actualizaciones conservan su ubicación actual.
+	Custom folders use AppImage on Linux.	Las carpetas personalizadas usan AppImage en Linux.
+	The system manages install locations here.	El sistema gestiona las ubicaciones de instalación aquí.
+@msg	couldn't use install folder {path}: {reason}	no se pudo usar la carpeta de instalación {path}: {reason}
+@msg	this release has no AppImage for a custom install folder	esta versión no tiene un AppImage para una carpeta de instalación personalizada
+@msg	custom install folders aren't supported on this system	este sistema no admite carpetas de instalación personalizadas
+@msg	{path} already exists and wasn't installed by ArtCraft Launcher	{path} ya existe y no fue instalado por ArtCraft Launcher
+@msg	couldn't move {path} to Trash ({reason}). Remove it in Finder instead.	no se pudo mover {path} a la Papelera ({reason}). Elimínalo desde Finder.
+	Apps are placed inside this folder.	Las aplicaciones se guardan dentro de esta carpeta.

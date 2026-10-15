@@ -58,6 +58,9 @@ pub trait Host {
     fn reduce_motion(&self) -> bool {
         false
     }
+    fn pick_folder(&mut self, _initial: Option<&str>) -> Option<String> {
+        None
+    }
     /// Quit the launcher for real (not just hide to the tray).
     fn quit(&mut self) {}
 }
@@ -72,6 +75,7 @@ pub(crate) struct Toast {
 pub(crate) enum Dialog {
     Notes(String),
     ConfirmUninstall(String),
+    Install { app: String, folder: String },
     Settings,
     LauncherUpdate(artcraft_launcher_core::Release),
 }
@@ -83,6 +87,7 @@ impl Dialog {
         match self {
             Dialog::Notes(id) => ("notes", id),
             Dialog::ConfirmUninstall(id) => ("uninstall", id),
+            Dialog::Install { app, .. } => ("install", app),
             Dialog::Settings => ("settings", ""),
             Dialog::LauncherUpdate(r) => ("launcher-update", &r.tag),
         }
@@ -263,14 +268,39 @@ impl LauncherUi {
         self.entries.iter_mut().find(|e| e.app.id == id)
     }
 
-    /// Non-drawing work: runs every frame and also while the window is hidden in the tray.
-    pub fn logic(&mut self, ctx: &egui::Context, host: &mut dyn Host) {
-        set_current(crate::i18n::Lang::from_pref(&self.settings.language));
-        let options = BackendOptions { kinds: self.settings.preferred_kinds.clone(), prereleases: self.settings.prereleases };
+    pub(crate) fn configure(&mut self) {
+        let options = BackendOptions {
+            kinds: self.settings.preferred_kinds.clone(),
+            prereleases: self.settings.prereleases,
+            install_locations: self.settings.install_locations.clone(),
+        };
         if self.sent_options.as_ref() != Some(&options) {
             self.backend.send(Command::Configure(options.clone()));
             self.sent_options = Some(options);
         }
+    }
+
+    pub(crate) fn custom_install_folders(&self) -> bool {
+        self.caps.manage_apps
+            && self.platform.is_some_and(|p| {
+                matches!(p.os, artcraft_launcher_core::Os::Windows | artcraft_launcher_core::Os::MacOs | artcraft_launcher_core::Os::Linux)
+            })
+            && !crate::settings::is_flatpak_sandbox()
+    }
+
+    pub(crate) fn install_app(&mut self, id: &str) {
+        if !self.custom_install_folders() || self.entry(id).is_some_and(|e| e.installed.is_some()) {
+            self.send(Command::Install { app: id.to_string() });
+            return;
+        }
+        self.dialog =
+            Some(Dialog::Install { app: id.to_string(), folder: self.settings.install_locations.per_app.get(id).cloned().unwrap_or_default() });
+    }
+
+    /// Non-drawing work: runs every frame and also while the window is hidden in the tray.
+    pub fn logic(&mut self, ctx: &egui::Context, host: &mut dyn Host) {
+        set_current(crate::i18n::Lang::from_pref(&self.settings.language));
+        self.configure();
         if !self.started {
             self.started = true;
             self.backend.send(Command::CheckForUpdates { force: false });

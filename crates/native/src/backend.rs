@@ -20,6 +20,7 @@ use crate::http::{self, Http, Stop};
 use crate::install::{self, Job};
 use crate::manifest::Manifest;
 use crate::paths::Paths;
+use crate::process;
 use crate::source::{GitHubSource, ReleaseSource};
 
 /// The longest the launcher's own update waits for other installs to end before it gives up
@@ -467,8 +468,17 @@ fn run_install(
         .get(app.id)
         .cloned()
         .ok_or("the latest release hasn't been found yet. Check for updates first.")?;
-    let (asset, kind) = planned_asset(app, &release, platform, options, existing, record)
-        .ok_or_else(|| format!("{} {} has no download for {}", app.name, release.version_label(), platform.label()))?;
+    let (asset, kind) = planned_asset(app, &release, platform, options, existing, record).ok_or_else(|| {
+        if platform.os == artcraft_launcher_core::Os::Linux
+            && options.install_locations.folder(app.id).is_some()
+            && existing.is_none()
+            && record.is_none()
+        {
+            "this release has no AppImage for a custom install folder".to_string()
+        } else {
+            format!("{} {} has no download for {}", app.name, release.version_label(), platform.label())
+        }
+    })?;
     let mut last_emit = Instant::now() - Duration::from_secs(1);
     let mut phase = |p: JobPhase| {
         // Downloads report thousands of times; the UI needs ~20 a second.
@@ -478,7 +488,7 @@ fn run_install(
         last_emit = Instant::now();
         shared.emit(Event::Progress { app: app.id.to_string(), phase: p });
     };
-    let mut job = Job { http, paths, stop, phase: &mut phase };
+    let mut job = Job { http, paths, stop, phase: &mut phase, install_locations: &options.install_locations };
     let new_record = install::install(app, &release, &asset, kind, existing, record, &mut job)?;
     {
         let mut m = shared.manifest.lock().unwrap_or_else(PoisonError::into_inner);
@@ -577,7 +587,13 @@ fn planned_asset(
     record: Option<&crate::manifest::Record>,
 ) -> Option<(Asset, PackageKind)> {
     let stems: Vec<&str> = app.stems().collect();
-    let kinds = install::choose_kinds(existing, record, &options.kinds);
+    let custom_linux = platform.os == artcraft_launcher_core::Os::Linux
+        && !process::in_sandbox()
+        && existing.is_none()
+        && record.is_none()
+        && options.install_locations.folder(app.id).is_some();
+    let kinds =
+        if custom_linux { vec![artcraft_launcher_core::PackageKind::AppImage] } else { install::choose_kinds(existing, record, &options.kinds) };
     pick_asset(release, &stems, platform, &kinds).map(|(a, k)| (a.clone(), k))
 }
 
@@ -1215,6 +1231,32 @@ mod tests {
             .map(|name| Asset { url: format!("https://example.invalid/{name}"), name, size: 3, sha256: None })
             .collect();
         Release { assets, ..Release::default() }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_custom_linux_folder_requires_appimage_without_package_fallback() {
+        if process::in_sandbox() {
+            return;
+        }
+        let app = CraftApp::by_id(APP).unwrap();
+        let platform = Platform { os: Os::Linux, arch: Arch::X64 };
+        let options = BackendOptions {
+            kinds: vec![PackageKind::Deb],
+            install_locations: artcraft_launcher_core::protocol::InstallLocations { root: Some("/custom/apps".into()), ..Default::default() },
+            ..Default::default()
+        };
+        let mut release = release("0.5.0");
+        assert_eq!(planned_asset(app, &release, platform, &options, None, None).unwrap().1, PackageKind::AppImage);
+        release.assets.retain(|a| !a.name.ends_with(".AppImage"));
+        assert!(planned_asset(app, &release, platform, &options, None, None).is_none());
+        let existing =
+            Installed { version: None, source: artcraft_launcher_core::InstallSource::Deb, location: "/usr/bin/photocraft".into(), package: None };
+        let system = BackendOptions { kinds: options.kinds.clone(), ..Default::default() };
+        assert_eq!(
+            planned_asset(app, &release, platform, &options, Some(&existing), None),
+            planned_asset(app, &release, platform, &system, Some(&existing), None)
+        );
     }
 
     /// A backend that knows `release("0.5.0")` and keeps its files under `root`.

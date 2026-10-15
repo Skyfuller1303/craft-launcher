@@ -346,3 +346,17 @@ filter	Installed	Zainstalowane
 	ArtCraft on GitHub	ArtCraft na GitHubie
 	Join the ArtCraft Discord	Dołącz do Discorda ArtCraft
 @plural	ArtCraft Launcher · {n} update available|ArtCraft Launcher · {n} updates available	ArtCraft Launcher · {n} dostępna aktualizacja|ArtCraft Launcher · {n} dostępne aktualizacje|ArtCraft Launcher · {n} dostępnych aktualizacji
+	Install folder	Folder instalacji
+	Default install folder	Domyślny folder instalacji
+	System default	Domyślny systemowy
+	Browse…	Przeglądaj…
+	Use default	Użyj domyślnego
+	New installs use this folder. Updates stay in their current location.	Nowe instalacje używają tego folderu. Aktualizacje pozostają w obecnej lokalizacji.
+	Custom folders use AppImage on Linux.	W Linuksie własne foldery korzystają z formatu AppImage.
+	The system manages install locations here.	W tym środowisku system zarządza lokalizacjami instalacji.
+@msg	couldn't use install folder {path}: {reason}	nie można użyć folderu instalacji {path}: {reason}
+@msg	this release has no AppImage for a custom install folder	to wydanie nie zawiera AppImage dla własnego folderu instalacji
+@msg	custom install folders aren't supported on this system	własne foldery instalacji nie są obsługiwane w tym systemie
+@msg	{path} already exists and wasn't installed by ArtCraft Launcher	{path} już istnieje i nie został zainstalowany przez ArtCraft Launcher
+@msg	couldn't move {path} to Trash ({reason}). Remove it in Finder instead.	nie można przenieść {path} do Kosza ({reason}). Usuń go w Finderze.
+	Apps are placed inside this folder.	Aplikacje są umieszczane w tym folderze.

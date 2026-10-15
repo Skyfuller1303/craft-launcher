@@ -12,7 +12,7 @@ use crate::widgets::{self, Cell, Kind};
 
 impl LauncherUi {
     pub(crate) fn dialogs(&mut self, ctx: &egui::Context, host: &mut dyn Host) {
-        let Some(dialog) = self.dialog.clone() else {
+        let Some(mut dialog) = self.dialog.clone() else {
             self.alert_popup(ctx);
             return;
         };
@@ -22,14 +22,17 @@ impl LauncherUi {
         let modal = egui::Modal::new(egui::Id::new("dialog").with(dialog.key()))
             .frame(egui::Frame::new().fill(t.bg).stroke(egui::Stroke::new(1.0, t.line_strong)).shadow(theme::shadow(&t)).inner_margin(24));
         let mut close = false;
-        let response = match &dialog {
+        let response = match &mut dialog {
             Dialog::Notes(id) => modal.show(ctx, |ui| close = self.notes_dialog(ui, id)),
             Dialog::ConfirmUninstall(id) => modal.show(ctx, |ui| close = self.uninstall_dialog(ui, id)),
+            Dialog::Install { app, folder } => modal.show(ctx, |ui| close = self.install_dialog(ui, app, folder, host)),
             Dialog::Settings => modal.show(ctx, |ui| close = self.settings_dialog(ui, host)),
             Dialog::LauncherUpdate(r) => modal.show(ctx, |ui| close = self.launcher_update_dialog(ui, r)),
         };
         if close || response.should_close() {
             self.dialog = None;
+        } else {
+            self.dialog = Some(dialog);
         }
     }
 
@@ -180,6 +183,55 @@ impl LauncherUi {
         close
     }
 
+    fn install_dialog(&mut self, ui: &mut egui::Ui, id: &str, folder: &mut String, host: &mut dyn Host) -> bool {
+        let Some(app) = self.entry(id).map(|e| e.app) else { return true };
+        ui.set_width(440.0f32.min(ui.ctx().content_rect().width() - 80.0));
+        Self::title(ui, None, app.name, tl!("Install folder"));
+        let default = self.settings.install_locations.root.as_deref().unwrap_or(tl!("System default"));
+        Self::folder_field(ui, folder, Some(default), host);
+        if self.platform.is_some_and(|p| p.os == Os::Linux) {
+            ui.label(tl!("Custom folders use AppImage on Linux."));
+        }
+        ui.add_space(14.0);
+        let mut close = false;
+        ui.horizontal(|ui| {
+            if widgets::button(ui, tl!("Install"), Kind::Primary, 100.0).clicked() {
+                if folder.is_empty() {
+                    self.settings.install_locations.per_app.remove(id);
+                } else {
+                    self.settings.install_locations.per_app.insert(id.to_string(), folder.clone());
+                }
+                self.configure();
+                self.send(Command::Install { app: id.to_string() });
+                close = true;
+            }
+            close |= widgets::button(ui, tl!("Cancel"), Kind::Secondary, 90.0).clicked();
+        });
+        close
+    }
+
+    fn folder_field(ui: &mut egui::Ui, folder: &mut String, default: Option<&str>, host: &mut dyn Host) {
+        let label = ui.label(tl!("Install folder"));
+        ui.add(
+            egui::TextEdit::singleline(folder)
+                .id_salt("install_folder")
+                .hint_text(default.unwrap_or(tl!("System default")))
+                .desired_width(f32::INFINITY),
+        )
+        .labelled_by(label.id);
+        ui.label(tl!("Apps are placed inside this folder."));
+        ui.horizontal(|ui| {
+            if widgets::button(ui, tl!("Browse…"), Kind::Secondary, 100.0).clicked()
+                && let Some(selected) = host.pick_folder(if folder.is_empty() { default } else { Some(folder.as_str()) })
+            {
+                *folder = selected;
+            }
+            if widgets::button(ui, tl!("Use default"), Kind::Secondary, 120.0).clicked() {
+                folder.clear();
+            }
+        });
+    }
+
     fn settings_dialog(&mut self, ui: &mut egui::Ui, host: &mut dyn Host) -> bool {
         // Leave room for the frame (48 px) and a 16 px gutter on each side.
         let viewport = ui.ctx().content_rect();
@@ -284,6 +336,21 @@ impl LauncherUi {
         }
         ui.checkbox(&mut self.settings.notify, tl!("Notify me when an installed app has an update"));
         ui.checkbox(&mut self.settings.prereleases, tl!("Include pre-releases (betas and release candidates)"));
+
+        if self.caps.manage_apps {
+            section(ui, tl!("Default install folder"));
+            if self.custom_install_folders() {
+                let mut folder = self.settings.install_locations.root.clone().unwrap_or_default();
+                Self::folder_field(ui, &mut folder, None, host);
+                self.settings.install_locations.root = (!folder.is_empty()).then_some(folder);
+                ui.label(RichText::new(tl!("New installs use this folder. Updates stay in their current location.")).size(12.0).color(t.muted));
+                if self.platform.is_some_and(|p| p.os == Os::Linux) {
+                    ui.label(RichText::new(tl!("Custom folders use AppImage on Linux.")).size(12.0).color(t.muted));
+                }
+            } else {
+                ui.label(tl!("The system manages install locations here."));
+            }
+        }
 
         if self.caps.manage_apps && self.platform.is_some_and(|p| p.os == Os::Linux) {
             section(ui, tl!("Installing on Linux"));
