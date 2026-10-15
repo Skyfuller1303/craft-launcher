@@ -93,6 +93,28 @@ impl Backend for Fake {
     }
 }
 
+struct PlatformFake {
+    inner: Fake,
+    platform: Platform,
+}
+impl Backend for PlatformFake {
+    fn send(&mut self, command: Command) {
+        self.inner.send(command);
+    }
+    fn poll(&mut self) -> Vec<Event> {
+        self.inner.poll()
+    }
+    fn capabilities(&self) -> Capabilities {
+        self.inner.capabilities()
+    }
+    fn platform(&self) -> Option<Platform> {
+        Some(self.platform)
+    }
+    fn now(&self) -> i64 {
+        self.inner.now()
+    }
+}
+
 struct NoHost;
 impl Host for NoHost {}
 
@@ -172,7 +194,7 @@ fn harness_with(
     manage: bool,
     scale: f32,
 ) -> (Harness<'static, Option<LauncherUi>>, Rc<RefCell<Vec<Command>>>) {
-    harness_full(events, view, theme, manage, scale, artcraft_launcher_ui_egui::TitleBar::Native, Rc::default())
+    harness_full(events, view, theme, manage, scale, artcraft_launcher_ui_egui::TitleBar::Native, Rc::default(), None)
 }
 
 /// Like `harness_with`, with the details pictures answered as `pictures` says (changeable during the test).
@@ -184,7 +206,7 @@ fn harness_pictures(
     scale: f32,
     pictures: Rc<Cell<Pictures>>,
 ) -> (Harness<'static, Option<LauncherUi>>, Rc<RefCell<Vec<Command>>>) {
-    harness_full(events, view, theme, manage, scale, artcraft_launcher_ui_egui::TitleBar::Native, pictures)
+    harness_full(events, view, theme, manage, scale, artcraft_launcher_ui_egui::TitleBar::Native, pictures, None)
 }
 
 fn harness_with_title_bar(
@@ -195,9 +217,10 @@ fn harness_with_title_bar(
     scale: f32,
     bar: artcraft_launcher_ui_egui::TitleBar,
 ) -> (Harness<'static, Option<LauncherUi>>, Rc<RefCell<Vec<Command>>>) {
-    harness_full(events, view, theme, manage, scale, bar, Rc::default())
+    harness_full(events, view, theme, manage, scale, bar, Rc::default(), None)
 }
 
+#[allow(clippy::too_many_arguments)] // Test fixture inputs vary independently across existing cases.
 fn harness_full(
     events: Vec<Event>,
     view: ViewMode,
@@ -206,6 +229,7 @@ fn harness_full(
     scale: f32,
     bar: artcraft_launcher_ui_egui::TitleBar,
     pictures: Rc<Cell<Pictures>>,
+    platform: Option<Platform>,
 ) -> (Harness<'static, Option<LauncherUi>>, Rc<RefCell<Vec<Command>>>) {
     struct HeaderHost(artcraft_launcher_ui_egui::TitleBar);
     impl Host for HeaderHost {
@@ -218,7 +242,11 @@ fn harness_full(
     artcraft_launcher_ui_egui::i18n::set_test_lang(artcraft_launcher_ui_egui::i18n::Lang::EN);
     let sent = Rc::new(RefCell::new(Vec::new()));
     let sent2 = sent.clone();
-    let mut backend = Some(Fake { events, sent: sent2, manage, pictures, asked: Vec::new(), clock: Rc::new(Cell::new(NOW)) });
+    let fake = Fake { events, sent: sent2, manage, pictures, asked: Vec::new(), clock: Rc::new(Cell::new(NOW)) };
+    let mut backend: Option<Box<dyn Backend>> = Some(match platform {
+        Some(platform) => Box::new(PlatformFake { inner: fake, platform }),
+        None => Box::new(fake),
+    });
     let settings = Settings { view, notify: false, ..Settings::default() };
     // No `.wgpu()`: it gives every test its own GPU device, and those segfault on parallel test threads (see above).
     // The default renderer creates one only when a test renders.
@@ -233,7 +261,7 @@ fn harness_full(
                 } else {
                     artcraft_launcher_ui_egui::theme::ThemeChoice::Light
                 };
-                *state = Some(LauncherUi::new(ui.ctx(), Box::new(b), s));
+                *state = Some(LauncherUi::new(ui.ctx(), b, s));
             }
             if let Some(l) = state.as_mut() {
                 l.logic(&ui.ctx().clone(), &mut HeaderHost(bar));
@@ -363,6 +391,34 @@ fn use_default_removes_an_app_override_and_settings_can_reset_the_root() {
     h.get_by_label("Use default").click();
     h.run_steps(2);
     assert_eq!(h.state().as_ref().unwrap().settings.install_locations.root, None);
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_package_choice_can_select_portable_and_configures_the_backend() {
+    let (mut h, sent) = harness_full(
+        events(),
+        ViewMode::Grid,
+        egui::Theme::Light,
+        true,
+        1.0,
+        artcraft_launcher_ui_egui::TitleBar::Native,
+        Rc::default(),
+        Some(Platform { os: Os::Windows, arch: Arch::X64 }),
+    );
+    h.run_steps(8);
+    h.get_by_label("Settings").click();
+    h.run_steps(4);
+    h.get_by_value("Installer (.msi)").click();
+    h.run_steps(2);
+    h.get_by_label("Portable (.zip)").click();
+    h.run_steps(3);
+    assert_eq!(h.state().as_ref().unwrap().settings.preferred_kinds, [artcraft_launcher_core::PackageKind::PortableZip]);
+    assert!(
+        sent.borrow()
+            .iter()
+            .any(|command| matches!(command, Command::Configure(options) if options.kinds == [artcraft_launcher_core::PackageKind::PortableZip]))
+    );
 }
 
 #[test]

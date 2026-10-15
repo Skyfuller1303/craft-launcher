@@ -40,7 +40,7 @@ pub struct Job<'a> {
 }
 
 /// Downloads and installs `asset` of `release`. Returns a record when the launcher owns the
-/// result (AppImage, macOS bundle, tarball); MSI installs are found in the registry.
+/// result (portable ZIP, AppImage, macOS bundle, tarball); MSI installs are found in the registry.
 /// `previous` is the launcher's record of the copy being replaced, if it installed it.
 pub fn install(
     app: &CraftApp,
@@ -51,6 +51,26 @@ pub fn install(
     previous: Option<&Record>,
     job: &mut Job<'_>,
 ) -> Result<Option<Record>, String> {
+    install_at(app, release, asset, kind, existing, previous, job, None)
+}
+
+type RecordCommit<'a> = Option<&'a mut dyn FnMut(&Record) -> Result<(), String>>;
+
+#[allow(clippy::too_many_arguments)]
+pub fn install_at(
+    app: &CraftApp,
+    release: &Release,
+    asset: &Asset,
+    kind: PackageKind,
+    existing: Option<&Installed>,
+    previous: Option<&Record>,
+    job: &mut Job<'_>,
+    commit: RecordCommit<'_>,
+) -> Result<Option<Record>, String> {
+    #[cfg(windows)]
+    let mut commit = commit;
+    #[cfg(not(windows))]
+    let _ = commit;
     #[allow(unused_variables)]
     let destination = destination(app, kind, existing, previous, job.install_locations)?;
     if let Some(inst) = existing
@@ -72,6 +92,17 @@ pub fn install(
             .map(|path| Some(record(&version, kind, path, Vec::new(), false))),
         #[cfg(windows)]
         PackageKind::Msi => windows::run_msi(&file, destination.as_deref(), job.stop, &mut *job.phase).map(|_| None),
+        #[cfg(windows)]
+        PackageKind::PortableZip => crate::portable::install(app, &file, &version, previous, job.paths, destination.as_deref(), &mut |record| {
+            if release.version.is_some() && crate::detect::windows::executable_version(&record.path).as_ref() != release.version.as_ref() {
+                return Err("The portable executable does not match the selected version. The installation was rolled back.".into());
+            }
+            match commit.as_deref_mut() {
+                Some(commit) => commit(record),
+                None => Ok(()),
+            }
+        })
+        .map(Some),
         #[cfg(target_os = "linux")]
         PackageKind::Deb | PackageKind::Rpm | PackageKind::Flatpak => linux::install_package(kind, &file, job.stop, &mut *job.phase).map(|_| None),
         #[cfg(target_os = "linux")]
@@ -108,6 +139,9 @@ fn destination(
     previous: Option<&Record>,
     locations: &InstallLocations,
 ) -> Result<Option<PathBuf>, String> {
+    if kind == PackageKind::PortableZip && previous.is_some_and(|record| record.kind == PackageKind::PortableZip) {
+        return Ok(None);
+    }
     if let Some(inst) = existing {
         let exe = Path::new(&inst.location);
         return Ok(match kind {
@@ -117,7 +151,7 @@ fn destination(
         });
     }
     let Some(folder) = locations.folder(app.id) else { return Ok(None) };
-    if !matches!(kind, PackageKind::Dmg | PackageKind::AppImage | PackageKind::Msi) || process::in_sandbox() {
+    if !matches!(kind, PackageKind::Dmg | PackageKind::AppImage | PackageKind::Msi | PackageKind::PortableZip) || process::in_sandbox() {
         return Err("custom install folders aren't supported on this system".into());
     }
     let parent = selected_folder(folder, kind != PackageKind::Msi)?;
@@ -210,7 +244,7 @@ pub fn available_kinds() -> Vec<PackageKind> {
     #[cfg(target_os = "macos")]
     return vec![PackageKind::Dmg];
     #[cfg(windows)]
-    return vec![PackageKind::Msi];
+    return vec![PackageKind::Msi, PackageKind::PortableZip];
     #[cfg(target_os = "linux")]
     return linux::available_kinds();
     #[cfg(target_os = "freebsd")]
@@ -298,6 +332,10 @@ pub fn uninstall(
         return Err(format!("{} is running. Quit it, then try again.", app.name));
     }
     match installed.source {
+        #[cfg(windows)]
+        InstallSource::Launcher if record.is_some_and(|r| r.kind == PackageKind::PortableZip) => {
+            crate::portable::remove(app, record.ok_or("the launcher has no record of these files")?)
+        }
         #[cfg(windows)]
         InstallSource::Msi => windows::uninstall_msi(app, stop, phase),
         #[cfg(target_os = "macos")]
@@ -1341,6 +1379,17 @@ mod tests {
         let app = CraftApp::by_id("photocraft").unwrap();
         let locations = InstallLocations { root: Some(dir.path().display().to_string()), ..Default::default() };
         assert_eq!(destination(app, PackageKind::Msi, None, None, &locations).unwrap(), Some(dir.path().join("PhotoCraft")));
+        assert_eq!(destination(app, PackageKind::PortableZip, None, None, &locations).unwrap(), Some(dir.path().to_path_buf()));
+        let old = record("0.5.0", PackageKind::PortableZip, dir.path().join("PhotoCraft/photocraft.exe"), vec![], false);
+        let unavailable = InstallLocations { root: Some(dir.path().join("missing").display().to_string()), ..Default::default() };
+        assert_eq!(destination(app, PackageKind::PortableZip, None, Some(&old), &unavailable).unwrap(), None);
+        let msi = Installed {
+            version: None,
+            source: InstallSource::Msi,
+            location: dir.path().join("MSI/PhotoCraft/photocraft.exe").display().to_string(),
+            package: None,
+        };
+        assert_eq!(destination(app, PackageKind::Msi, Some(&msi), Some(&old), &unavailable).unwrap(), Some(dir.path().join("MSI/PhotoCraft")));
         assert!(destination(app, PackageKind::TarGz, None, None, &locations).unwrap_err().contains("aren't supported"));
     }
 
